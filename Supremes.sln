@@ -18,10 +18,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Supremes.Test", "Supremes.T
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Supremes", "Supremes\Supremes.csproj", "{C5B1D585-78EC-4333-803C-4CBB1C512889}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Supremes.net45", "Supremes.net45\Supremes.net45.csproj", "{88D4E55C-3335-46FA-9033-6AF6B6491E96}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Supremes.Test.net45", "Supremes.Test.net45\Supremes.Test.net45.csproj", "{2B55F178-0425-4CA9-AB34-4674C0A551AB}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,14 +32,6 @@ Global
 		{C5B1D585-78EC-4333-803C-4CBB1C512889}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C5B1D585-78EC-4333-803C-4CBB1C512889}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C5B1D585-78EC-4333-803C-4CBB1C512889}.Release|Any CPU.Build.0 = Release|Any CPU
-		{88D4E55C-3335-46FA-9033-6AF6B6491E96}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{88D4E55C-3335-46FA-9033-6AF6B6491E96}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{88D4E55C-3335-46FA-9033-6AF6B6491E96}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{88D4E55C-3335-46FA-9033-6AF6B6491E96}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2B55F178-0425-4CA9-AB34-4674C0A551AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2B55F178-0425-4CA9-AB34-4674C0A551AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2B55F178-0425-4CA9-AB34-4674C0A551AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2B55F178-0425-4CA9-AB34-4674C0A551AB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

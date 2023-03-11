@@ -112,12 +112,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Supremes.net45\Supremes.net45.csproj">
-      <Project>{88d4e55c-3335-46fa-9033-6af6b6491e96}</Project>
-      <Name>Supremes.net45</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="NUnit">
       <Version>2.6.4</Version>
     </PackageReference>

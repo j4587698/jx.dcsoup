@@ -1,27 +1,29 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard1.3</TargetFramework>
-    <PackageId>dcsoup</PackageId>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>jx.dcsoup</PackageId>
     <Version>1.0.0</Version>
-    <Authors>INOMATA Kentaro</Authors>
+    <Authors>jx,INOMATA Kentaro</Authors>
     <Product />
     <Company />
     <Summary>dcsoup is a .NET library for working with real-world HTML. It provides a very convenient API for extracting and manipulating data, using the best of DOM, CSS, and jquery-like methods.</Summary>
-    <Description>dcsoup is a .NET library for working with real-world HTML. It provides a very convenient API for extracting and manipulating data, using the best of DOM, CSS, and jquery-like methods.
+    <Description>
+        此fork仅为了移植一些jsoup的代码，以便在.net core下使用。不保证维护。
+        dcsoup is a .NET library for working with real-world HTML. It provides a very convenient API for extracting and manipulating data, using the best of DOM, CSS, and jquery-like methods.
 This library is basically a port of jsoup, a Java HTML parser library. see also: http://jsoup.org/
 API reference is available at: https://raw.githubusercontent.com/matarillo/dcsoup/master/sandcastle/Help/dcsoup.chm</Description>
-    <Copyright>Copyright © 2015 INOMATA Kentaro</Copyright>
+    <Copyright>Copyright © 2023 jx INOMATA Kentaro</Copyright>
     <PackageLicenseUrl>http://opensource.org/licenses/MIT</PackageLicenseUrl>
-    <PackageProjectUrl>https://github.com/matarillo/dcsoup</PackageProjectUrl>
-    <PackageIconUrl>https://raw.githubusercontent.com/matarillo/dcsoup/master/nuget/dcsoup_icon.png</PackageIconUrl>
+    <PackageProjectUrl>https://github.com/j4587698/jx.dcsoup</PackageProjectUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/j4587698/jx.dcsoup/master/nuget/dcsoup_icon.png</PackageIconUrl>
     <PackageTags>HTML jsoup jquery parse parser parsing crawl crawler crawling scrape scraper scraping headless xpath agility</PackageTags>
-    <RepositoryUrl>https://github.com/matarillo/dcsoup</RepositoryUrl>
+    <RepositoryUrl>https://github.com/j4587698/jx.dcsoup</RepositoryUrl>
     <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard1.3\Supremes.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\netstandard2.0\Supremes.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
