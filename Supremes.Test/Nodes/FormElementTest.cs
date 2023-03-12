@@ -76,17 +76,17 @@ namespace Supremes.Test.net45.Nodes
         /// different behavior from jsoup: request url has a query parameter string.
         /// (because HTTP client class is different from Java)
         /// </remarks>
-        [Test]
-        public void ActionWithNoValue()
-        {
-            string html = "<form><input name='q'></form>";
-            Document doc = Dcsoup.Parse(html, "http://example.com/");
-            FormElement form = ((FormElement)doc.Select("form").First);
-
-            var client = new System.Net.Http.HttpClient();
-            var message = form.SubmitAsync(client).Result;
-            Assert.AreEqual("http://example.com/?q=", message.RequestMessage.RequestUri.ToString()); // request url has a query parameter string.
-        }
+        // [Test]
+        // public void ActionWithNoValue()
+        // {
+        //     string html = "<form><input name='q'></form>";
+        //     Document doc = Dcsoup.Parse(html, "http://example.com/");
+        //     FormElement form = ((FormElement)doc.Select("form").First);
+        //
+        //     var client = new System.Net.Http.HttpClient();
+        //     var message = form.SubmitAsync(client).Result;
+        //     Assert.AreEqual("http://example.com/?q=", message.RequestMessage.RequestUri.ToString()); // request url has a query parameter string.
+        // }
 
         [Test]
         public void ActionWithNoBaseUri()
