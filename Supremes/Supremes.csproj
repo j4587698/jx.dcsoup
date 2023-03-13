@@ -14,7 +14,6 @@
 This library is basically a port of jsoup, a Java HTML parser library. see also: http://jsoup.org/
 API reference is available at: https://raw.githubusercontent.com/matarillo/dcsoup/master/sandcastle/Help/dcsoup.chm</Description>
     <Copyright>Copyright © 2023 jx INOMATA Kentaro</Copyright>
-    <PackageLicenseUrl>http://opensource.org/licenses/MIT</PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/j4587698/jx.dcsoup</PackageProjectUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/j4587698/jx.dcsoup/master/nuget/dcsoup_icon.png</PackageIconUrl>
     <PackageTags>HTML jsoup jquery parse parser parsing crawl crawler crawling scrape scraper scraping headless xpath agility</PackageTags>
