@@ -18,10 +18,10 @@ namespace Supremes.Test.net45.Nodes
         }
 
         [Test]
-        [ExpectedException(typeof(ArgumentException))]
         public void ConstructorValidationThrowsExceptionOnNulls()
         {
-            DocumentType fail = new DocumentType("html", null, null, "");
+            Assert.Throws<ArgumentException>(() => new DocumentType("html", null, null, ""));
+            //DocumentType fail = new DocumentType("html", null, null, "");
         }
 
         [Test]

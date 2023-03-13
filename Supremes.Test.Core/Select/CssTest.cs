@@ -14,8 +14,8 @@ namespace Supremes.Test.net45.Select
     {
         private Document html = null;
         private static string htmlString;
-
-        [TestFixtureSetUp]
+        
+        [OneTimeSetUp]
         public static void InitClass()
         {
             var sb = new StringBuilder("<html><head></head><body>");

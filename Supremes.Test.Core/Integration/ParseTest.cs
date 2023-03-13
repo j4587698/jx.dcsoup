@@ -13,6 +13,12 @@ namespace Supremes.Test.net45.Integration
     [TestFixture]
     public class ParseTest
     {
+        [SetUp]
+        public void Setup()
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        }
+        
         [Test]
         public void TestSmhBizArticle()
         {
@@ -150,7 +156,7 @@ namespace Supremes.Test.net45.Integration
             @in = GetFilePath("/htmltests/meta-charset-2.html"); //
             doc = Dcsoup.ParseFile(@in, null, "http://example.com"); // gb2312, no charset
             Assert.AreEqual("utf-8", doc.OutputSettings.Charset.WebName); // charset name is lower case
-            Assert.IsFalse("新".Equals(doc.Text));
+            Assert.IsTrue("新".Equals(doc.Text));
 
             // confirm fallback to utf8
             @in = GetFilePath("/htmltests/meta-charset-3.html");

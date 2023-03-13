@@ -27,3 +27,4 @@ using System.Runtime.InteropServices;
 // Build Numbers by using the '*' as shown below:
 //[assembly: AssemblyVersion("1.0.0.*")]
 [assembly: InternalsVisibleTo ("Supremes.Test")]
+[assembly: InternalsVisibleTo ("Supremes.Test.Core")]
