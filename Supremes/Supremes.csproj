@@ -19,7 +19,7 @@ API reference is available at: https://raw.githubusercontent.com/matarillo/dcsou
     <PackageIconUrl>https://raw.githubusercontent.com/j4587698/jx.dcsoup/master/nuget/dcsoup_icon.png</PackageIconUrl>
     <PackageTags>HTML jsoup jquery parse parser parsing crawl crawler crawling scrape scraper scraping headless xpath agility</PackageTags>
     <RepositoryUrl>https://github.com/j4587698/jx.dcsoup</RepositoryUrl>
-    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
       <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
