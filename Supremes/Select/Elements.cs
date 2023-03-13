@@ -18,28 +18,22 @@ namespace Supremes.Nodes
     /// method.
     /// </summary>
     /// <author>Jonathan Hedley, jonathan@hedley.net</author>
-    public sealed class Elements : IList<Element>
+    public sealed class Elements : List<Element>, ICollection<Element>
     {
-        private IList<Element> contents;
-
         public Elements()
         {
-            contents = new List<Element>();
         }
 
-        public Elements(int initialCapacity)
+        public Elements(int initialCapacity) : base(initialCapacity)
         {
-            contents = new List<Element>(initialCapacity);
         }
 
-        public Elements(ICollection<Element> elements)
+        public Elements(ICollection<Element> elements) : base(elements)
         {
-            contents = new List<Element>(elements);
         }
 
-        public Elements(IList<Element> elements)
+        public Elements(IList<Element> elements) : base(elements)
         {
-            contents = elements;
         }
 
         public Elements(params Element[] elements) : this((IList<Element>)elements)
@@ -54,8 +48,7 @@ namespace Supremes.Nodes
         {
             Elements clone = (Elements)this.MemberwiseClone();
             List<Element> elements = new List<Element>();
-            clone.contents = elements;
-            foreach (Element e in contents)
+            foreach (Element e in this)
             {
             	elements.Add((Element)e.Clone());
             }
@@ -76,7 +69,7 @@ namespace Supremes.Nodes
         /// <seealso cref="HasAttr(string)">HasAttr(string)</seealso>
         public string Attr(string attributeKey)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 if (element.HasAttr(attributeKey))
                 {
@@ -93,7 +86,7 @@ namespace Supremes.Nodes
         /// <returns>true if any of the elements have the attribute; false if none do.</returns>
         public bool HasAttr(string attributeKey)
         {
-            foreach (Element element in contents)
+            foreach (var element in this)
             {
                 if (element.HasAttr(attributeKey))
                 {
@@ -111,7 +104,7 @@ namespace Supremes.Nodes
         /// <returns>this</returns>
         public Elements Attr(string attributeKey, string attributeValue)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.Attr(attributeKey, attributeValue);
             }
@@ -125,7 +118,7 @@ namespace Supremes.Nodes
         /// <returns>this (for chaining)</returns>
         public Elements RemoveAttr(string attributeKey)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.RemoveAttr(attributeKey);
             }
@@ -141,7 +134,7 @@ namespace Supremes.Nodes
         /// <returns>this</returns>
         public Elements AddClass(string className)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.AddClass(className);
             }
@@ -157,7 +150,7 @@ namespace Supremes.Nodes
         /// <returns>this</returns>
         public Elements RemoveClass(string className)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.RemoveClass(className);
             }
@@ -174,7 +167,7 @@ namespace Supremes.Nodes
         /// <returns>this</returns>
         public Elements ToggleClass(string className)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.ToggleClass(className);
             }
@@ -190,7 +183,7 @@ namespace Supremes.Nodes
         /// <returns>true if any do, false if none do</returns>
         public bool HasClass(string className)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 if (element.HasClass(className))
                 {
@@ -228,7 +221,7 @@ namespace Supremes.Nodes
             }
             set
             {
-                foreach (Element element in contents)
+                foreach (Element element in this)
                 {
                     element.Val = value;
                 }
@@ -249,7 +242,7 @@ namespace Supremes.Nodes
             get
             {
                 StringBuilder sb = new StringBuilder();
-                foreach (Element element in contents)
+                foreach (Element element in this)
                 {
                     if (sb.Length != 0)
                     {
@@ -269,7 +262,7 @@ namespace Supremes.Nodes
         {
             get
             {
-                foreach (Element element in contents)
+                foreach (Element element in this)
                 {
                     if (element.HasText)
                     {
@@ -300,7 +293,7 @@ namespace Supremes.Nodes
             get
             {
                 StringBuilder sb = new StringBuilder();
-                foreach (Element element in contents)
+                foreach (Element element in this)
                 {
                     if (sb.Length != 0)
                     {
@@ -312,7 +305,7 @@ namespace Supremes.Nodes
             }
             set
             {
-                foreach (Element element in contents)
+                foreach (Element element in this)
                 {
                     element.Html = value;
                 }
@@ -330,7 +323,7 @@ namespace Supremes.Nodes
             get
             {
                 StringBuilder sb = new StringBuilder();
-                foreach (Element element in contents)
+                foreach (Element element in this)
                 {
                     if (sb.Length != 0)
                     {
@@ -394,7 +387,7 @@ namespace Supremes.Nodes
             }
             set
             {
-                foreach (Element element in contents)
+                foreach (Element element in this)
                 {
                     element.TagName = value;
                 }
@@ -409,7 +402,7 @@ namespace Supremes.Nodes
         /// <seealso cref="Element.Prepend(string)">Element.Prepend(string)</seealso>
         public Elements Prepend(string html)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.Prepend(html);
             }
@@ -424,7 +417,7 @@ namespace Supremes.Nodes
         /// <seealso cref="Element.Append(string)">Element.Append(string)</seealso>
         public Elements Append(string html)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.Append(html);
             }
@@ -439,7 +432,7 @@ namespace Supremes.Nodes
         /// <seealso cref="Node.Before(string)">Node.Before(string)</seealso>
         public Elements Before(string html)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.Before(html);
             }
@@ -454,7 +447,7 @@ namespace Supremes.Nodes
         /// <seealso cref="Node.After(string)">Node.After(string)</seealso>
         public Elements After(string html)
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.After(html);
             }
@@ -482,7 +475,7 @@ namespace Supremes.Nodes
         public Elements Wrap(string html)
         {
             Validate.NotEmpty(html);
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.Wrap(html);
             }
@@ -513,7 +506,7 @@ namespace Supremes.Nodes
         /// <seealso cref="Node.Unwrap()">Node.Unwrap()</seealso>
         public Elements Unwrap()
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.Unwrap();
             }
@@ -541,7 +534,7 @@ namespace Supremes.Nodes
         /// <seealso cref="Remove()">Remove()</seealso>
         public Elements Empty()
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.Empty();
             }
@@ -574,7 +567,7 @@ namespace Supremes.Nodes
         /// <seealso cref="Empty()">Empty()</seealso>
         public Elements Remove()
         {
-            foreach (Element element in contents)
+            foreach (Element element in this)
             {
                 element.Remove();
             }
@@ -622,9 +615,9 @@ namespace Supremes.Nodes
             // exclude set. package open so that Elements can implement .not() selector.
         }
 
-        private static Supremes.Nodes.Elements FilterOut(ICollection<Element> elements, ICollection<Element> outs)
+        private static Elements FilterOut(ICollection<Element> elements, ICollection<Element> outs)
         {
-            Supremes.Nodes.Elements output = new Supremes.Nodes.Elements();
+            Elements output = new Elements();
             foreach (Element el in elements)
             {
                 bool found = false;
@@ -658,7 +651,7 @@ namespace Supremes.Nodes
         /// </returns>
         public Elements Eq(int index)
         {
-            return contents.Count > index
+            return this.Count > index
                 ? new Supremes.Nodes.Elements(this[index])
                 : new Supremes.Nodes.Elements();
         }
@@ -683,11 +676,11 @@ namespace Supremes.Nodes
             get
             {
                 LinkedHashSet<Element> combo = new LinkedHashSet<Element>();
-                foreach (Element e in contents)
+                foreach (Element e in this)
                 {
                     combo.AddRange(e.Parents);
                 }
-                return new Supremes.Nodes.Elements(combo);
+                return new Elements(combo);
             }
         }
 
@@ -697,19 +690,13 @@ namespace Supremes.Nodes
         /// Get the first matched element.
         /// </summary>
         /// <returns>The first matched element, or <c>null</c> if contents is empty.</returns>
-        public Element First
-        {
-            get { return contents.Count == 0 ? null : contents[0]; }
-        }
+        public Element First => Count == 0 ? null : this[0];
 
         /// <summary>
         /// Get the last matched element.
         /// </summary>
         /// <returns>The last matched element, or <c>null</c> if contents is empty.</returns>
-        public Element Last
-        {
-            get { return contents.Count == 0 ? null : contents[contents.Count - 1]; }
-        }
+        public Element Last => this.Count == 0 ? null : this[Count - 1];
 
         /// <summary>
         /// Perform a depth-first traversal on each of the selected elements.
@@ -720,7 +707,7 @@ namespace Supremes.Nodes
         {
             Validate.NotNull(nodeVisitor);
             NodeTraversor traversor = new NodeTraversor(nodeVisitor);
-            foreach (Element el in contents)
+            foreach (Element el in this)
             {
                 traversor.Traverse(el);
             }
@@ -742,149 +729,18 @@ namespace Supremes.Nodes
         {
             get
             {
-                List<FormElement> forms = contents.OfType<FormElement>().ToList();
+                List<FormElement> forms = this.OfType<FormElement>().ToList();
                 return forms.AsReadOnly();
             }
         }
 
         // implements List<Element> delegates:
-
-        /// <summary>
-        /// Gets the number of elements contained in the <see cref="Elements" />.
-        /// </summary>
-        public int Count
-        {
-            get
-            {
-                return contents.Count;
-            }
-        }
-
-        /// <summary>
-        /// Determines whether the <see cref="Elements" /> contains a specific value.
-        /// </summary>
-        /// <param name="o"></param>
-        /// <returns></returns>
-        public bool Contains(object o)
-        {
-            return contents.Contains(o);
-        }
-
-        /// <summary>
-        /// Returns the hash code for this instance.
-        /// </summary>
-        /// <returns></returns>
-        public IEnumerator<Element> GetEnumerator()
-        {
-            return contents.GetEnumerator();
-        }
-
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return this.GetEnumerator();
-        }
-
-        /// <summary>
-        /// Adds an item to the <see cref="Elements" />.
-        /// </summary>
-        /// <param name="element"></param>
-        public void Add(Element element)
-        {
-            contents.Add(element);
-        }
-
-        /// <summary>
-        /// Removes the first occurrence of a specific object from the <see cref="Elements" />.
-        /// </summary>
-        /// <param name="element"></param>
-        /// <returns></returns>
-        public bool Remove(Element element)
-        {
-            return contents.Remove(element);
-        }
-
-        /// <summary>
-        /// Removes all items from the <see cref="Elements" />.
-        /// </summary>
-        public void Clear()
-        {
-            contents.Clear();
-        }
-
-        /// <summary>
-        /// Compares two <see cref="Elements"/> instances for equality.
-        /// </summary>
-        /// <param name="obj"></param>
-        /// <returns></returns>
-        public override bool Equals(object obj)
-        {
-            return contents.Equals(obj);
-        }
-
-        /// <summary>
-        /// Returns the hash code for this instance.
-        /// </summary>
-        /// <returns></returns>
-        public override int GetHashCode()
-        {
-            return contents.GetHashCode();
-        }
-
-        /// <summary>
-        /// Gets or sets the element at the specified index.
-        /// </summary>
-        public Element this[int index]
-        {
-            get { return contents[index]; }
-            set { contents[index] = value; }
-        }
-
-        /// <summary>
-        /// Inserts an item to the <see cref="Elements" />
-        /// at the specified index.
-        /// </summary>
-        /// <param name="index"></param>
-        /// <param name="element"></param>
-        public void Insert(int index, Element element)
-        {
-            contents.Insert(index, element);
-        }
-
-        /// <summary>
-        /// Removes the <see cref="Elements" /> item at the specified index.
-        /// </summary>
-        /// <param name="index"></param>
-        public void RemoveAt(int index)
-        {
-            contents.RemoveAt(index);
-        }
-
-        /// <summary>
-        /// Determines the index of a specific item in the <see cref="Elements" />.
-        /// </summary>
-        /// <param name="element"></param>
-        /// <returns></returns>
-        public int IndexOf(Element element)
-        {
-            return contents.IndexOf(element);
-        }
-
+        
+        
         #region collection interface
 
-        bool ICollection<Element>.IsReadOnly
-        {
-            get { return false; }
-        }
-
-        void ICollection<Element>.CopyTo(Element[] array, int arrayIndex)
-        {
-            contents.CopyTo(array, arrayIndex);
-        }
-
-        bool ICollection<Element>.Contains(Element element)
-        {
-            return contents.Contains(element);
-        }
+        bool ICollection<Element>.IsReadOnly => false;
+        
 
         #endregion
     }
