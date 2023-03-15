@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <PackageId>jx.dcsoup</PackageId>
     <Version>1.0.1</Version>
     <Authors>jx,INOMATA Kentaro</Authors>
@@ -20,6 +20,7 @@ API reference is available at: https://raw.githubusercontent.com/matarillo/dcsou
     <RepositoryUrl>https://github.com/j4587698/jx.dcsoup</RepositoryUrl>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
       <PackageLicenseExpression>MIT</PackageLicenseExpression>
+      <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

@@ -1,4 +1,5 @@
-﻿using Supremes.Nodes;
+﻿using System;
+using Supremes.Nodes;
 
 namespace Supremes.Select
 {
@@ -38,6 +39,23 @@ namespace Supremes.Select
         /// the depth of the node, relative to the root node. E.g., the root node has depth 0, and a child node
         /// of that will have depth 1.
         /// </param>
-        void Tail(Node node, int depth);
+        void Tail(Node node, int depth)
+        {
+        }
+    }
+    
+    public class LambdaNodeVisitor : INodeVisitor
+    {
+        private Action<Node, int> action;
+        
+        public LambdaNodeVisitor(Action<Node, int> action)
+        {
+            this.action = action;
+        }
+        
+        public void Head(Node node, int depth)
+        {
+            action(node, depth);
+        }
     }
 }

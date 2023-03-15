@@ -706,11 +706,7 @@ namespace Supremes.Nodes
         internal Elements Traverse(INodeVisitor nodeVisitor)
         {
             Validate.NotNull(nodeVisitor);
-            NodeTraversor traversor = new NodeTraversor(nodeVisitor);
-            foreach (Element el in this)
-            {
-                traversor.Traverse(el);
-            }
+            NodeTraversor.Traverse(nodeVisitor, this);
             return this;
         }
 

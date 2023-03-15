@@ -67,6 +67,16 @@ namespace Supremes.Nodes
         /// </remarks>
         /// <returns>node name</returns>
         internal abstract string NodeName { get; }
+        
+        /// Check if this Node has an actual Attributes object.
+        protected abstract bool HasAttributes();
+        
+        /// Checks if this node has a parent. Nodes won't have parents if (e.g.) they are newly created and not added as a child
+        /// to an existing node, or if they are a {@link #shallowClone()}. In such cases, {@link #parent()} will return {@code null}.
+        /// @return if this node has a parent.
+        public bool HasParent() {
+            return parentNode != null;
+        }
 
         /// <summary>
         /// Get an attribute's value by its key.

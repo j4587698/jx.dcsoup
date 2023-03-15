@@ -6,7 +6,7 @@ namespace Supremes.Select
     /// Collects a list of elements that match the supplied criteria.
     /// </summary>
     /// <author>Jonathan Hedley</author>
-    internal class Collector
+    public class Collector
     {
         public Collector()
         {
@@ -22,40 +22,59 @@ namespace Supremes.Select
         public static Elements Collect(Evaluator eval, Element root)
         {
             Elements elements = new Elements();
-            new NodeTraversor(new Collector.Accumulator(root, elements, eval)).Traverse(root);
+            NodeTraversor.Traverse(new LambdaNodeVisitor((node, depth) =>
+            {
+                if (node is Element el)
+                {
+                    if (eval.Matches(root, el))
+                        elements.Add(el);
+                }
+            }), root);
             return elements;
         }
 
-        private class Accumulator : INodeVisitor
+        public static Element FindFirst(Evaluator eval, Element root)
         {
-            private readonly Element root;
+            FirstFinder finder = new FirstFinder(eval);
+            return finder.Find(root, root);
+        }
+        
+        public class FirstFinder : NodeFilter
+        {
+            private Element evalRoot = null;
+            private Element match = null;
+            private Evaluator eval;
 
-            private readonly Elements elements;
-
-            private readonly Evaluator eval;
-
-            internal Accumulator(Element root, Elements elements, Evaluator eval)
+            public FirstFinder(Evaluator eval)
             {
-                this.root = root;
-                this.elements = elements;
                 this.eval = eval;
             }
 
-            public void Head(Node node, int depth)
+            public Element Find(Element root, Element start)
+            {
+                evalRoot = root;
+                match = null;
+                NodeTraversor.Filter(this, start);
+                return match;
+            }
+
+            public NodeFilter.FilterResult Head(Node node, int depth)
             {
                 if (node is Element)
                 {
                     Element el = (Element)node;
-                    if (eval.Matches(root, el))
+                    if (eval.Matches(evalRoot, el))
                     {
-                        elements.Add(el);
+                        match = el;
+                        return NodeFilter.FilterResult.Stop;
                     }
                 }
+                return NodeFilter.FilterResult.Continue;
             }
 
-            public void Tail(Node node, int depth)
+            public NodeFilter.FilterResult Tail(Node node, int depth)
             {
-                // void
+                return NodeFilter.FilterResult.Continue;
             }
         }
     }

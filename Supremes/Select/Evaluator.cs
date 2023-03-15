@@ -9,7 +9,7 @@ namespace Supremes.Select
     /// <summary>
     /// Evaluates that an element matches the selector.
     /// </summary>
-    internal abstract class Evaluator
+    public abstract class Evaluator
     {
         public Evaluator()
         {
