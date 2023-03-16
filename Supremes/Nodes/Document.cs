@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Supremes.Parsers;
 
 namespace Supremes.Nodes
 {
@@ -234,8 +235,6 @@ namespace Supremes.Nodes
     public sealed class Document : Element
     {
         private DocumentOutputSettings outputSettings = new DocumentOutputSettings();
-
-        private DocumentQuirksMode quirksMode = DocumentQuirksMode.NoQuirks;
 
         private string location;
 
@@ -522,7 +521,7 @@ namespace Supremes.Nodes
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
         public DocumentOutputSettings OutputSettings
         {
-            get { return outputSettings; }
+            get => outputSettings;
             set
             {
                 Validate.NotNull(outputSettings);
@@ -537,10 +536,11 @@ namespace Supremes.Nodes
         /// if you want to use fluent API, write <c>using Supremes.Fluent;</c>.
         /// </remarks>
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
-        public DocumentQuirksMode QuirksMode
-        {
-            get { return quirksMode; }
-            set { quirksMode = value; }
-        }
+        public DocumentQuirksMode QuirksMode { get; set; } = DocumentQuirksMode.NoQuirks;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public Parser Parser { get; set; }
     }
 }

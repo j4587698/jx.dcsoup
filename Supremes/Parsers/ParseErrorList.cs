@@ -8,7 +8,7 @@ namespace Supremes.Parsers
     /// A container for ParseErrors.
     /// </summary>
     /// <author>Jonathan Hedley</author>
-#if (!NETSTANDARD1_3)
+#if (!NETSTANDARD2_0_OR_GREATER)
     [Serializable]
 #endif
     internal class ParseErrorList : List<ParseError>
@@ -25,15 +25,9 @@ namespace Supremes.Parsers
             this.maxSize = maxSize;
         }
 
-        internal bool CanAddError
-        {
-            get { return Count < maxSize; }
-        }
+        internal bool CanAddError => Count < maxSize;
 
-        internal int MaxSize
-        {
-            get { return maxSize; }
-        }
+        internal int MaxSize => maxSize;
 
         internal static ParseErrorList NoTracking()
         {

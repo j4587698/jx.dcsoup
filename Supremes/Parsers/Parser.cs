@@ -45,6 +45,10 @@ namespace Supremes.Parsers
             Document doc = treeBuilder.Parse(html, baseUri, errors);
             return doc;
         }
+        
+        public List<Node> ParseFragmentInput(String fragment, Element context, String baseUri) {
+            return treeBuilder.ParseFragment(fragment, context, baseUri, this);
+        }
 
         // gets & sets
 
@@ -52,10 +56,7 @@ namespace Supremes.Parsers
         /// Get the TreeBuilder currently in use.
         /// </summary>
         /// <returns>current TreeBuilder.</returns>
-        internal TreeBuilder TreeBuilder
-        {
-            get { return treeBuilder; }
-        }
+        internal TreeBuilder TreeBuilder => treeBuilder;
 
         /// <summary>
         /// Update the TreeBuilder used when parsing content.
@@ -72,10 +73,7 @@ namespace Supremes.Parsers
         /// Check if parse error tracking is enabled.
         /// </summary>
         /// <returns>current track error state.</returns>
-        public bool CanTrackErrors
-        {
-            get { return maxErrors > 0; }
-        }
+        public bool CanTrackErrors => maxErrors > 0;
 
         /// <summary>
         /// Enable or disable parse error tracking for the next parse.
@@ -94,10 +92,7 @@ namespace Supremes.Parsers
         /// Retrieve the parse errors, if any, from the last parse.
         /// </summary>
         /// <returns>list of parse errors, up to the size of the maximum errors tracked.</returns>
-        public IList<ParseError> Errors
-        {
-            get { return errors; }
-        }
+        public IList<ParseError> Errors => errors;
 
         // builders
 
@@ -109,10 +104,7 @@ namespace Supremes.Parsers
         /// based on a knowledge of the semantics of the incoming tags.
         /// </remarks>
         /// <returns>a new HTML parser.</returns>
-        public static Parser HtmlParser
-        {
-            get { return new Parser(new HtmlTreeBuilder()); }
-        }
+        public static Parser HtmlParser => new Parser(new HtmlTreeBuilder());
 
         /// <summary>
         /// Create a new XML parser.
@@ -122,11 +114,8 @@ namespace Supremes.Parsers
         /// rather creates a simple tree directly from the input.
         /// </remarks>
         /// <returns>a new simple XML parser.</returns>
-        public static Parser XmlParser
-        {
-            get { return new Parser(new XmlTreeBuilder()); }
-        }
-        
+        public static Parser XmlParser => new Parser(new XmlTreeBuilder());
+
         // utility methods
         
         /// <summary>

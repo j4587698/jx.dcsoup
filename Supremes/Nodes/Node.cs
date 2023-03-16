@@ -20,7 +20,7 @@ namespace Supremes.Nodes
     {
         internal Node parentNode;
 
-        internal IList<Node> childNodes;
+        internal IList<Node> EmptyNodes = new List<Node>();
 
         internal Attributes attributes;
 
@@ -29,34 +29,11 @@ namespace Supremes.Nodes
         internal int siblingIndex;
 
         /// <summary>
-        /// Create a new Node.
+        /// Default constructor. Doesn't set up base uri, children, or attributes; use with caution.
         /// </summary>
-        /// <param name="baseUri">base URI</param>
-        /// <param name="attributes">attributes (not null, but may be empty)</param>
-        internal Node(string baseUri, Attributes attributes)
+        protected Node()
         {
-            Validate.NotNull(baseUri);
-            Validate.NotNull(attributes);
-            childNodes = new List<Node>(4);
-            this.baseUri = baseUri.Trim();
-            this.attributes = attributes;
-        }
-
-        internal Node(string baseUri)
-            : this(baseUri, new Attributes())
-        {
-        }
-
-        /// <summary>
-        /// Default constructor.
-        /// </summary>
-        /// <remarks>
-        /// Doesn't setup base uri, children, or attributes; use with caution.
-        /// </remarks>
-        internal Node()
-        {
-            childNodes = new List<Node>();
-            attributes = null;
+            
         }
 
         /// <summary>
@@ -119,9 +96,15 @@ namespace Supremes.Nodes
         /// <returns>
         /// attributes (which implements iterable, in same order as presented in original HTML).
         /// </returns>
-        public virtual Attributes Attributes
-        {
-            get { return attributes; }
+        public virtual Attributes Attributes => attributes;
+        
+        /// <summary>
+        ///  Get the number of attributes that this Node has.
+        /// </summary>
+        /// <returns>the number of attributes</returns>
+        public int AttributesSize() {
+            // added so that we can test how many attributes exist without implicitly creating the Attributes object
+            return HasAttributes() ? Attributes.Count : 0;
         }
 
         /// <summary>
@@ -169,40 +152,39 @@ namespace Supremes.Nodes
             attributes.Remove(attributeKey);
             return this;
         }
-
+        
         /// <summary>
-        /// Get or Set the base URI of this node.
-        /// When set, it updates the base URI of this node and all of its descendants.
+        ///  Clear (remove) each of the attributes in this node.
         /// </summary>
-        /// <value>base URI to set</value>
-        /// <returns>base URI</returns>
-        public string BaseUri
+        /// <returns>this, for chaining</returns>
+        public Node ClearAttributes()
         {
-            get { return baseUri; }
-            set
+            if (HasAttributes())
             {
-                Validate.NotNull(value);
-                Traverse(new BaseUriVisitor(value));
+                Attributes.Clear();
             }
+            return this;
         }
 
-        private sealed class BaseUriVisitor : INodeVisitor
-        {
-            internal BaseUriVisitor(string baseUri)
-            {
-                this.baseUri = baseUri;
-            }
-
-            public void Head(Node node, int depth)
-            {
-                ((Supremes.Nodes.Node)node).baseUri = baseUri;
-            }
-
-            public void Tail(Node node, int depth)
-            {
-            }
-
-            private readonly string baseUri;
+        /// <summary>
+        ///  Get the base URI that applies to this node. Will return an empty string if not defined. Used to make relative links
+        /// absolute.
+        /// </summary>
+        public abstract string BaseUri();
+        
+        /// <summary>
+        /// Set the baseUri for just this node (not its descendants), if this Node tracks base URIs.
+        /// </summary>
+        /// <param name="baseUri">baseUri new URI</param>
+        protected abstract void DoSetBaseUri(string baseUri);
+        
+        /// <summary>
+        /// Update the base URI of this node and all of its descendants.
+        /// </summary>
+        /// <param name="baseUri">base URI to set</param>
+        public void setBaseUri(string baseUri) {
+            Validate.NotNull(baseUri);
+            DoSetBaseUri(baseUri);
         }
 
         /// <summary>
@@ -243,92 +225,18 @@ namespace Supremes.Nodes
         public virtual string AbsUrl(string attributeKey)
         {
             Validate.NotEmpty(attributeKey);
-            string relUrl = Attr(attributeKey);
-            if (!HasAttr(attributeKey))
-            {
-                // nothing to make absolute with
-                return string.Empty;
-            }
-            else
-            {
-                Uri @base;
-                Uri abs;
-                if (!TryCreateAbsolute(baseUri, out @base))
-                {
-                    // the base is unsuitable, but the attribute may be abs on its own, so try that
-                    return TryCreateAbsolute(relUrl, out abs)
-                        ? abs.ToString()
-                        : string.Empty;
-                }
-                // .NET resolves '//path/file + ?foo' to '//path/file?foo' as desired, so no workaround needed
-                return TryCreateRelative(@base, relUrl, out abs)
-                    ? abs.AbsoluteUri.ToString()
-                    : string.Empty;
-            }
-        }
+            if (!(HasAttributes() && Attributes().HasKeyIgnoreCase(attributeKey))) // not using hasAttr, so that we don't recurse down hasAttr->absUrl
+                return "";
 
-        private static bool TryCreateAbsolute(string absoluteUri, out Uri result)
-        {
-            if (Uri.TryCreate(absoluteUri, UriKind.Absolute, out result))
-            {
-#if (NETSTANDARD1_3)
-                if (IsKnownScheme(result.Scheme))
-#else
-                if (UriParser.IsKnownScheme(result.Scheme))
-#endif
-                {
-                    return true;
-                }
-            }
-            result = default(Uri);
-            return false;
+            return StringUtil.Resolve(BaseUri(), Attributes().GetIgnoreCase(attributeKey));
         }
-
-        private static bool TryCreateRelative(Uri baseUri, string relativeUri, out Uri result)
-        {
-            if (Uri.TryCreate(baseUri, relativeUri, out result))
-            {
-#if (NETSTANDARD1_3)
-                if (IsKnownScheme(result.Scheme))
-#else
-                if (UriParser.IsKnownScheme(result.Scheme))
-#endif
-                {
-                    return true;
-                }
-            }
-            result = default(Uri);
-            return false;
-        }
-
-#if (NETSTANDARD1_3)
-        private static bool IsKnownScheme(string scheme)
-        {
-            switch (scheme)
-            {
-                case "http":
-                case "https":
-                case "ws":
-                case "wss":
-                case "ftp":
-                case "file":
-                case "gopher":
-                case "nntp":
-                case "news":
-                case "mailto":
-                case "uuid":
-                case "telnet":
-                case "ldap":
-                case "net.tcp":
-                case "net.pipe":
-                case "vsmacros":
-                    return true;
-                default:
-                    return false;
-            }
-        }
-#endif
-
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        protected abstract List<Node> EnsureChildNodes();
+        
         /// <summary>
         /// Get a child node by its 0-based index.
         /// </summary>
@@ -340,7 +248,7 @@ namespace Supremes.Nodes
         /// </returns>
         public Node ChildNode(int index)
         {
-            return childNodes[index];
+            return EnsureChildNodes()[index];
         }
 
         /// <summary>
@@ -351,9 +259,15 @@ namespace Supremes.Nodes
         /// themselves can be manipulated.
         /// </remarks>
         /// <returns>list of children. If no children, returns an empty list.</returns>
-        public IReadOnlyList<Node> ChildNodes
+        public IList<Node> ChildNodes()
         {
-            get { return new ReadOnlyCollection<Node>(childNodes); }
+            if (ChildNodeSize == 0)
+                return EmptyNodes;
+
+            List<Node> children = EnsureChildNodes();
+            List<Node> rewrap = new List<Node>(children.Count); // wrapped so that looping and moving will not throw a CME as the source changes
+            rewrap.AddRange(children);
+            return rewrap;
         }
 
         /// <summary>
@@ -365,6 +279,7 @@ namespace Supremes.Nodes
         /// <returns>a deep copy of this node's children</returns>
         public IList<Node> ChildNodesCopy()
         {
+            var childNodes = EnsureChildNodes();
             IList<Node> children = new List<Node>(childNodes.Count);
             foreach (Node node in childNodes)
             {
@@ -377,23 +292,45 @@ namespace Supremes.Nodes
         /// Get the number of child nodes that this node holds.
         /// </summary>
         /// <returns>the number of child nodes that this node holds.</returns>
-        public int ChildNodeSize
-        {
-            get { return childNodes.Count; }
-        }
+        public abstract int ChildNodeSize();
 
         internal Node[] ChildNodesAsArray()
         {
-            return childNodes.ToArray();
+            return EnsureChildNodes().ToArray();
         }
+        
+        /// <summary>
+        ///  Delete all this node's children.
+        /// </summary>
+        /// <returns>this node, for chaining</returns>
+        public abstract Node Empty();
 
         /// <summary>
         /// Gets this node's parent node.
         /// </summary>
         /// <returns>parent node; or null if no parent.</returns>
-        public Node Parent
+        public Node Parent => parentNode;
+
+        /// <summary>
+        /// Gets this node's parent node. Not overridable by extending classes, so useful if you really just need the Node type.
+        /// </summary>
+        public Node ParentNode => parentNode;
+
+        /// <summary>
+        /// Get this node's root node; that is, its topmost ancestor. If this node is the top ancestor, returns {@code this}.
+        /// </summary>
+        public Node Root
         {
-            get { return parentNode; }
+            get
+            {
+                var node = this;
+                while (node.parentNode != null)
+                {
+                    node = node.parentNode;
+                }
+
+                return node;
+            }
         }
 
         /// <summary>
@@ -406,18 +343,8 @@ namespace Supremes.Nodes
         {
             get
             {
-                if (this is Document)
-                {
-                    return (Document)this;
-                }
-                else if (parentNode == null)
-                {
-                    return null;
-                }
-                else
-                {
-                    return parentNode.OwnerDocument;
-                }
+                Node root = Root;
+                return root as Document;
             }
         }
 
@@ -429,8 +356,10 @@ namespace Supremes.Nodes
         /// </remarks>
         public void Remove()
         {
-            Validate.NotNull(parentNode);
-            parentNode.RemoveChild(this);
+            if (parentNode != null)
+            {
+                parentNode.RemoveChild(this);
+            }
         }
 
         /// <summary>
