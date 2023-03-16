@@ -1,6 +1,7 @@
 ﻿using Supremes.Helper;
 using System;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Supremes.Nodes
 {
@@ -23,20 +24,15 @@ namespace Supremes.Nodes
 
         private string value;
 
-        /// <summary>
-        /// Create a new attribute from unencoded (raw) key and value.
-        /// </summary>
-        /// <param name="key">attribute key</param>
-        /// <param name="value">attribute value</param>
-        /// <seealso cref="CreateFromEncoded(string, string)">
-        /// CreateFromEncoded(string, string)
-        /// </seealso>
-        internal Attribute(string key, string value)
+        internal Attributes Parent { get; set; } // used to update the holding Attributes when the key / value is changed via this interface
+
+        public Attribute(string key, string value, Attributes parent = null)
         {
             Validate.NotEmpty(key);
             Validate.NotNull(value);
-            this.key = key.Trim().ToLower();
+            this.key = key.Trim();
             this.value = value;
+            Parent = parent;
         }
 
         /// <summary>
@@ -46,11 +42,22 @@ namespace Supremes.Nodes
         /// <value>the new key; must not be null when set</value>
         public string Key
         {
-            get { return key; }
+            get => key;
             set
             {
+                Validate.NotNull(value);
+                var key = value.Trim();
                 Validate.NotEmpty(value);
-                this.key = value.Trim().ToLower();
+                if (Parent != null)
+                {
+                    var i = Parent.IndexOfKey(key);
+                    if (i != Attributes.NotFound)
+                    {
+                        Parent.keys[i] = value;
+                    }
+                }
+
+                key = value;
             }
         }
 
@@ -61,10 +68,18 @@ namespace Supremes.Nodes
         /// <value>the new attribute value; must not be null when set</value>
         public string Value
         {
-            get { return value; }
+            get => value;
             set
             {
                 Validate.NotNull(value);
+                if (Parent != null)
+                {
+                    var i = Parent.IndexOfKey(key);
+                    if (i != Attributes.NotFound)
+                    {
+                        Parent.vals[i] = value;
+                    }
+                }
                 this.value = value;
             }
         }
@@ -111,6 +126,44 @@ namespace Supremes.Nodes
                     return Entities.EscapeMode.Base;
             }
         }
+        
+        public static void HtmlNoValidate(string key, string val, StringBuilder accum, DocumentOutputSettings outputSettings)
+        {
+            accum.Append(key);
+            if (!ShouldCollapseAttribute(key, val, outputSettings))
+            {
+                accum.Append("=\"");
+                Entities.Escape(accum, Attributes.CheckNotNull(val), outputSettings, true, false, false, false);
+                accum.Append('"');
+            }
+        }
+        
+        private static readonly Regex xmlKeyValid = new Regex("[a-zA-Z_:][-a-zA-Z0-9_:.]*");
+        private static readonly Regex xmlKeyReplace = new Regex("[^-a-zA-Z0-9_:.]");
+        private static readonly Regex htmlKeyValid = new Regex("[^\\x00-\\x1f\\x7f-\\x9f \"'/=]+");
+        private static readonly Regex htmlKeyReplace = new Regex("[\\x00-\\x1f\\x7f-\\x9f \"'/=]");
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="syntax"></param>
+        /// <returns></returns>
+        public static string GetValidKey(string key, DocumentSyntax syntax)
+        {
+            // we consider HTML attributes to always be valid. XML checks key validity
+            if (syntax == DocumentSyntax.Xml && !xmlKeyValid.IsMatch(key))
+            {
+                key = xmlKeyReplace.Replace(key, "");
+                return xmlKeyValid.IsMatch(key) ? key : null; // null if could not be coerced
+            }
+            else if (syntax == DocumentSyntax.Html && !htmlKeyValid.IsMatch(key))
+            {
+                key = htmlKeyReplace.Replace(key, "");
+                return htmlKeyValid.IsMatch(key) ? key : null; // null if could not be coerced
+            }
+            return key;
+        }
 
         /// <summary>
         /// Get the string representation of this attribute, implemented as
@@ -148,9 +201,23 @@ namespace Supremes.Nodes
         /// </summary>
         internal bool ShouldCollapseAttribute(DocumentOutputSettings @out)
         {
-            return (string.Empty.Equals(value) || string.Equals(value, key, StringComparison.OrdinalIgnoreCase))
-                && @out.Syntax == DocumentSyntax.Html
-                && Array.BinarySearch(booleanAttributes, key) >= 0;
+            return ShouldCollapseAttribute(key, value, @out);
+        }
+
+        internal static bool ShouldCollapseAttribute(string key, string val, DocumentOutputSettings @out)
+        {
+            return @out.Syntax == DocumentSyntax.Html &&
+                   (string.Empty.Equals(value) || string.Equals(value, key, StringComparison.OrdinalIgnoreCase))
+                   && IsBooleanAttribute(key);
+        }
+        
+        /// <summary>
+        /// Checks if this attribute name is defined as a boolean attribute in HTML5
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public static bool IsBooleanAttribute(string key) {
+            return Array.BinarySearch(booleanAttributes, key.ToLower()) >= 0;
         }
 
         /// <summary>
@@ -169,11 +236,11 @@ namespace Supremes.Nodes
             {
                 return false;
             }
-            if (key != null ? !key.Equals(attribute.Key) : attribute.Key != null)
+            if (!key?.Equals(attribute.Key) ?? attribute.Key != null)
             {
                 return false;
             }
-            if (value != null ? !value.Equals(attribute.Value) : attribute.Value != null)
+            if (!value?.Equals(attribute.Value) ?? attribute.Value != null)
             {
                 return false;
             }

@@ -190,7 +190,7 @@ namespace Supremes.Safety
                 }
             }
             Attributes enforcedAttrs = whitelist.GetEnforcedAttributes(sourceTag);
-            destAttrs.SetAll(enforcedAttrs);
+            destAttrs.AddAll(enforcedAttrs);
             return new Cleaner.ElementMeta(dest, numDiscarded);
         }
 

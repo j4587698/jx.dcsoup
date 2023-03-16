@@ -872,7 +872,7 @@ namespace Supremes.Parsers
                 Element newEl = Insert(entry.NodeName);
                 // todo: avoid fostering here?
                 // newEl.namespace(entry.namespace()); // todo: namespaces
-                newEl.Attributes.SetAll(entry.Attributes);
+                newEl.Attributes.AddAll(entry.Attributes);
                 // 10. replace entry with new entry
                 formattingElements[pos] = newEl;
                 // 11

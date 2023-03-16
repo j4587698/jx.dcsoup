@@ -31,18 +31,18 @@ namespace Supremes.Nodes
 
         // manages the key/val arrays
         private const int GrowthFactor = 2;
-        private const int NotFound = -1;
+        internal const int NotFound = -1;
         private const string EmptyString = "";
 
-        private List<string> keys = new(InitialCapacity);
-        private List<object> vals = new(InitialCapacity);
+        internal List<string> keys = new(InitialCapacity);
+        internal List<object> vals = new(InitialCapacity);
         
         /// <summary>
         /// 
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        int IndexOfKey(string key) {
+        internal int IndexOfKey(string key) {
             Validate.NotNull(key);
             return keys.IndexOf(key);
         }
@@ -212,14 +212,19 @@ namespace Supremes.Nodes
         /// Set a new attribute, or replace an existing one by key.
         /// </summary>
         /// <param name="attribute">attribute</param>
-        public void Put(Attribute attribute)
+        public Attributes Put(Attribute attribute)
         {
             Validate.NotNull(attribute);
-            if (attributes == null)
-            {
-                attributes = new LinkedHashMap<string, Attribute>(2);
-            }
-            attributes[attribute.Key] = attribute;
+            Put(attribute.Key, attribute.Value);
+            attribute.Parent = this;
+            return this;
+        }
+
+        private void Remove(int index)
+        {
+            Validate.IsFalse(index >= Count);
+            keys.RemoveAt(index);
+            vals.RemoveAt(index);
         }
 
         /// <summary>
@@ -229,11 +234,22 @@ namespace Supremes.Nodes
         public void Remove(string key)
         {
             Validate.NotEmpty(key);
-            if (attributes == null)
+            var i = IndexOfKey(key);
+            if (i != NotFound)
             {
-                return;
+                Remove(i);
             }
-            attributes.Remove(key.ToLower());
+        }
+
+        /// <summary>
+        /// Remove an attribute by key. <b>Case insensitive.</b>
+        /// </summary>
+        /// <param name="key">attribute key to remove</param>
+        public void RemoveIgnoreCase(string key)
+        {
+            var i = IndexOfKeyIgnoreCase(key);
+            if (i != NotFound)
+                Remove(i);
         }
 
         /// <summary>
@@ -243,25 +259,45 @@ namespace Supremes.Nodes
         /// <returns>true if key exists, false otherwise</returns>
         public bool ContainsKey(string key)
         {
-            return attributes != null && attributes.ContainsKey(key.ToLower());
+            return IndexOfKey(key) != NotFound;
+        }
+        
+        /// <summary>
+        /// Tests if these attributes contain an attribute with this key.
+        /// </summary>
+        /// <param name="key">key to check for</param>
+        /// <returns>true if key exists, false otherwise</returns>
+        public bool ContainsKeyIgnoreCase(string key)
+        {
+            return IndexOfKeyIgnoreCase(key) != NotFound;
+        }
+        
+        /// <summary>
+        /// Check if these attributes contain an attribute with a value for this key.
+        /// </summary>
+        /// <param name="key">key to check for</param>
+        /// <returns>true if key exists, and it has a value</returns>
+        public bool HasDeclaredValueForKey(string key) {
+            int i = IndexOfKey(key);
+            return i != NotFound && vals[i] != null;
+        }
+        
+        /// <summary>
+        /// Check if these attributes contain an attribute with a value for this key.
+        /// </summary>
+        /// <param name="key">key to check for</param>
+        /// <returns>true if key exists, and it has a value</returns>
+        public bool HasDeclaredValueForKeyIgnoreCase(string key) {
+            int i = IndexOfKeyIgnoreCase(key);
+            return i != NotFound && vals[i] != null;
         }
 
         /// <summary>
         /// Get the number of attributes in this set.
         /// </summary>
         /// <returns>size</returns>
-        public int Count
-        {
-            get
-            {
-                if (attributes == null)
-                {
-                    return 0;
-                }
-                return attributes.Count;
-            }
-        }
-        
+        public int Count => keys.Count;
+
         /// <summary>
         /// Test if this Attributes list is empty (size==0).
         /// </summary>
@@ -271,19 +307,16 @@ namespace Supremes.Nodes
         /// Add all the attributes from the incoming set to this set.
         /// </summary>
         /// <param name="incoming">attributes to add to these attributes.</param>
-        public void SetAll(Attributes incoming)
+        public void AddAll(Attributes incoming)
         {
             if (incoming == null || incoming.Count == 0)
             {
                 return;
             }
-            if (attributes == null)
+
+            foreach (var attribute in incoming)
             {
-                attributes = new LinkedHashMap<string, Attribute>(incoming.Count);
-            }
-            foreach (var pair in incoming.attributes)
-            {
-                attributes[pair.Key] = pair.Value;
+                Put(attribute);
             }
         }
 
@@ -293,9 +326,9 @@ namespace Supremes.Nodes
         /// <returns></returns>
         public IEnumerator<Attribute> GetEnumerator()
         {
-            if (attributes != null)
+            for (int i = 0; i < Count; i++)
             {
-                foreach (var pair in attributes) yield return pair.Value;
+                yield return new Attribute(keys[i], vals[i].ToString(), this);
             }
         }
         
@@ -304,7 +337,8 @@ namespace Supremes.Nodes
         /// </summary>
         public void Clear()
         {
-            attributes?.Clear();
+            keys.Clear();
+            vals.Clear();
         }
 
         /// <summary>
@@ -317,11 +351,7 @@ namespace Supremes.Nodes
         /// <returns>an view of the attributes as a List.</returns>
         public IReadOnlyList<Attribute> AsList()
         {
-            if (attributes == null)
-            {
-                return new List<Attribute>(0).AsReadOnly();
-            }
-            return attributes.Values.ToList().AsReadOnly();
+            return this.ToList().AsReadOnly();
         }
 
         /// <summary>
@@ -331,10 +361,7 @@ namespace Supremes.Nodes
         /// .
         /// </summary>
         /// <returns>map of custom data attributes.</returns>
-        public IDictionary<string, string> Dataset
-        {
-            get { return new Attributes._Dataset(this); }
-        }
+        public IDictionary<string, string> Dataset => new _Dataset(this);
 
         /// <summary>
         /// Get the HTML representation of these attributes.
@@ -353,15 +380,12 @@ namespace Supremes.Nodes
 
         internal void AppendHtmlTo(StringBuilder accum, DocumentOutputSettings @out)
         {
-            if (attributes == null)
-            {
-                return;
-            }
-            foreach (KeyValuePair<string, Attribute> entry in attributes)
-            {
-                Attribute attribute = (Attribute)entry.Value;
-                accum.Append(" ");
-                attribute.AppendHtmlTo(accum, @out);
+            for (int i = 0; i < Count; i++) {
+                if (IsInternalKey(keys[i]))
+                    continue;
+                string key = Attribute.GetValidKey(keys[i], @out.Syntax);
+                if (key != null)
+                    Attribute.HtmlNoValidate(key, (string) vals[i], accum.Append(' '), @out);
             }
         }
 
@@ -390,11 +414,13 @@ namespace Supremes.Nodes
             {
                 return false;
             }
-            if (attributes == null || that.attributes == null)
+
+            if (Count != that.Count)
             {
-                return (attributes == that.attributes);
+                return false;
             }
-            return attributes.SequenceEqual(that.attributes);
+
+            return this.All(x => that.ContainsKey(x.Key) && that[x.Key].Equals(x.Value));
         }
 
         /// <summary>
@@ -403,44 +429,26 @@ namespace Supremes.Nodes
         /// <returns></returns>
         public override int GetHashCode()
         {
-            return attributes != null ? attributes.GetHashCode() : 0;
+            int result = Count;
+            result = 31 * result + keys.GetHashCode();
+            result = 31 * result + vals.GetHashCode();
+            return result;
         }
 
         internal Attributes Clone()
         {
-            if (attributes == null)
-            {
-                return new Attributes();
-            }
             Attributes clone;
             clone = (Attributes)this.MemberwiseClone();
-            clone.attributes = new LinkedHashMap<string, Attribute>(attributes.Count);
-            foreach (Attribute attribute in this)
-            {
-                clone.attributes[attribute.Key] = attribute.Clone();
-            }
+            clone.keys = new List<string>(keys);
+            clone.vals = new List<object>(vals);
             return clone;
         }
         
         public void Normalize()
         {
-            if (attributes == null)
-            {
-                return;
+            for (int i = 0; i < Count; i++) {
+                keys[i] = keys[i].ToLower();
             }
-
-            var newMap = new LinkedHashMap<string, Attribute>();
-            foreach (var attribute in attributes)
-            {
-                var key = attribute.Key;
-                var value = attribute.Value;
-
-                var newKey = key.ToLower();
-
-                newMap[newKey] = value;
-            }
-
-            attributes = newMap;
         }
         
         /// <summary>
@@ -453,11 +461,11 @@ namespace Supremes.Nodes
                 return 0;
             bool preserve = settings.PreserveAttributeCase;
             int dupes = 0;
-            for (int i = 0; i < attributes.Count; i++) {
-                for (int j = i + 1; j < attributes.Count; j++) {
-                    if (attributes[j].Key == null)
+            for (int i = 0; i < Count; i++) {
+                for (int j = i + 1; j < Count; j++) {
+                    if (keys[j] == null)
                         break; // keys.length doesn't shrink when removing, so re-test
-                    if ((preserve && attributes[i].Key.Equals(keys[j])) || (!preserve && keys[i].Equals(keys[j], StringComparison.OrdinalIgnoreCase))) {
+                    if ((preserve && keys[i].Equals(keys[j])) || (!preserve && keys[i].Equals(keys[j], StringComparison.OrdinalIgnoreCase))) {
                         dupes++;
                         Remove(j);
                         j--;
@@ -469,28 +477,24 @@ namespace Supremes.Nodes
 
         private class _Dataset : IDictionary<string, string>
         {
-            private readonly LinkedHashMap<string, Attribute> enclosingAttributes;
+            private readonly Attributes attributes;
 
             public _Dataset(Attributes enclosing)
             {
-                if (enclosing.attributes == null)
-                {
-                    enclosing.attributes = new LinkedHashMap<string, Attribute>(2);
-                }
-                this.enclosingAttributes = enclosing.attributes;
+                this.attributes = enclosing;
             }
 
             public void Add(string key, string value)
             {
                 string dataKey = Attributes.DataKey(key);
                 Attribute attr = new Attribute(dataKey, value);
-                enclosingAttributes.Add(dataKey, attr);
+                attributes.Put(attr);
             }
 
             public bool ContainsKey(string key)
             {
                 string dataKey = Attributes.DataKey(key);
-                return enclosingAttributes.ContainsKey(dataKey);
+                return attributes.ContainsKey(dataKey);
             }
 
             public ICollection<string> Keys
@@ -501,41 +505,13 @@ namespace Supremes.Nodes
             public bool Remove(string key)
             {
                 string dataKey = Attributes.DataKey(key);
-                return enclosingAttributes.Remove(dataKey);
+                attributes.Remove(dataKey);
+                return true;
             }
-
-            public bool TryGetValue(string key, out string value)
-            {
-                string dataKey = Attributes.DataKey(key);
-                Attribute attr = null;
-                if (enclosingAttributes.TryGetValue(dataKey, out attr))
-                {
-                    value = attr.Value;
-                    return true;
-                }
-                value = null;
-                return false;
-            }
-
+            
             public ICollection<string> Values
             {
                 get { return this.Select(a => a.Value).ToArray(); }
-            }
-
-            public string this[string key]
-            {
-                get
-                {
-                    string dataKey = Attributes.DataKey(key);
-                    Attribute attr = enclosingAttributes[dataKey];
-                    return attr.Value;
-                }
-                set
-                {
-                    string dataKey = Attributes.DataKey(key);
-                    Attribute attr = new Attribute(dataKey, value);
-                    enclosingAttributes[dataKey] = attr;
-                }
             }
 
             public void Add(KeyValuePair<string, string> item)
@@ -548,44 +524,15 @@ namespace Supremes.Nodes
                 var dataAttrs = GetDataAttributes().ToList();
                 foreach (var dataAttr in dataAttrs)
                 {
-                    enclosingAttributes.Remove(dataAttr.Key);
+                    attributes.Remove(dataAttr.Key);
                 }
             }
 
             private IEnumerable<Attribute> GetDataAttributes()
             {
-                return enclosingAttributes
+                return attributes
                     .Select(p => (Attribute)p.Value)
                     .Where(a => a.IsDataAttribute());
-            }
-
-            public bool Contains(KeyValuePair<string, string> item)
-            {
-                string value = null;
-                return (this.TryGetValue(item.Key, out value) && (value == item.Value));
-            }
-
-            public void CopyTo(KeyValuePair<string, string>[] array, int arrayIndex)
-            {
-                foreach (var pair in this)
-                {
-                    array[arrayIndex++] = pair;
-                }
-            }
-
-            public int Count
-            {
-                get { return GetDataAttributes().Count(); }
-            }
-
-            public bool IsReadOnly
-            {
-                get { return false; }
-            }
-
-            public bool Remove(KeyValuePair<string, string> item)
-            {
-                return this.Contains(item) && this.Remove(item.Key);
             }
 
             public IEnumerator<KeyValuePair<string, string>> GetEnumerator()

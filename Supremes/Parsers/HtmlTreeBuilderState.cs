@@ -1137,7 +1137,7 @@ namespace Supremes.Parsers
                                     commonAncestor.AppendChild(lastNode);
                                 }
                                 Element adopter = new Element(formatEl.Tag, tb.GetBaseUri());
-                                adopter.Attributes.SetAll(formatEl.Attributes);
+                                adopter.Attributes.AddAll(formatEl.Attributes);
                                 Node[] childNodes = furthestBlock.ChildNodes.ToArray();
                                 foreach (Node childNode in childNodes)
                                 {
