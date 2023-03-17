@@ -186,8 +186,8 @@ namespace Supremes.Nodes
         /// <returns>attribute</returns>
         internal static Attribute CreateFromEncoded(string unencodedKey, string encodedValue)
         {
-            string value = Entities.Unescape(encodedValue, true);
-            return new Supremes.Nodes.Attribute(unencodedKey, value);
+            var value = Entities.Unescape(encodedValue, true);
+            return new Attribute(unencodedKey, value);
         }
 
         internal bool IsDataAttribute()
@@ -204,7 +204,7 @@ namespace Supremes.Nodes
             return ShouldCollapseAttribute(key, value, @out);
         }
 
-        internal static bool ShouldCollapseAttribute(string key, string val, DocumentOutputSettings @out)
+        internal static bool ShouldCollapseAttribute(string key, string value, DocumentOutputSettings @out)
         {
             return @out.Syntax == DocumentSyntax.Html &&
                    (string.Empty.Equals(value) || string.Equals(value, key, StringComparison.OrdinalIgnoreCase))

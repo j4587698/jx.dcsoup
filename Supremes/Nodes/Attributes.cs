@@ -148,9 +148,11 @@ namespace Supremes.Nodes
         public Attributes Put(string key, string value)
         {
             Validate.NotNull(key);
-            if (keys.Contains(key))
+            var i = IndexOfKey(key);
+            if (i != NotFound)
             {
-                keys[key] = value;
+                
+                vals[i] = value;
             }
             else
             {
@@ -219,6 +221,24 @@ namespace Supremes.Nodes
             attribute.Parent = this;
             return this;
         }
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public bool TryGetValue(string key, out string value)
+        {
+            var i = IndexOfKey(key);
+            if (i == NotFound)
+            {
+                value = string.Empty;
+                return false;
+            }
+            value = CheckNotNull(vals[i]);
+            return true;
+        }
 
         private void Remove(int index)
         {
@@ -250,6 +270,17 @@ namespace Supremes.Nodes
             var i = IndexOfKeyIgnoreCase(key);
             if (i != NotFound)
                 Remove(i);
+        }
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        public bool Contains(string key, object value)
+        {
+            var i = IndexOfKey(key);
+            return i != NotFound && vals[i].Equals(value);
         }
 
         /// <summary>
@@ -508,7 +539,18 @@ namespace Supremes.Nodes
                 attributes.Remove(dataKey);
                 return true;
             }
-            
+
+            public bool TryGetValue(string key, out string value)
+            {
+                return attributes.TryGetValue(key, out value);
+            }
+
+            public string this[string key]
+            {
+                get => attributes[key];
+                set => attributes[key] = value;
+            }
+
             public ICollection<string> Values
             {
                 get { return this.Select(a => a.Value).ToArray(); }
@@ -528,10 +570,28 @@ namespace Supremes.Nodes
                 }
             }
 
+            public bool Contains(KeyValuePair<string, string> item)
+            {
+                return attributes.Contains(item.Key, item.Value);
+            }
+
+            public void CopyTo(KeyValuePair<string, string>[] array, int arrayIndex)
+            {
+                throw new NotImplementedException();
+            }
+
+            public bool Remove(KeyValuePair<string, string> item)
+            {
+                attributes.Remove(item.Key);
+                return true;
+            }
+
+            public int Count => attributes.Count;
+            public bool IsReadOnly { get; }
+
             private IEnumerable<Attribute> GetDataAttributes()
             {
                 return attributes
-                    .Select(p => (Attribute)p.Value)
                     .Where(a => a.IsDataAttribute());
             }
 

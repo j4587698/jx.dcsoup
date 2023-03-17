@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Resources;
 using System.Text;
 #if (NETSTANDARD1_3)
@@ -238,11 +239,8 @@ namespace Supremes.Helper
         {
             Type thisType = typeof(Supremes.Helper.Entities);
             string resoucePath = thisType.Namespace + "." + filename;
-#if (NETSTANDARD1_3)
             Stream @in = thisType.GetTypeInfo().Assembly.GetManifestResourceStream(resoucePath);
-#else
-            Stream @in = thisType.Assembly.GetManifestResourceStream(resoucePath);
-#endif
+
             if (@in == null)
             {
                 throw new MissingManifestResourceException("Error loading entities resource: " + filename);
