@@ -12,6 +12,8 @@ namespace Supremes.Parsers
     internal class CharacterReader
     {
         internal const char EOF = '\uffff';
+        
+        private const int maxStringCacheLen = 12;
 
         private readonly string input;
 
@@ -20,6 +22,9 @@ namespace Supremes.Parsers
         private int pos = 0;
 
         private int mark = 0;
+        
+        private const int stringCacheSize = 512;
+        private string[] stringCache = new string[stringCacheSize]; // 在此文档中保存重用的字符串，以减少垃圾。
 
         internal CharacterReader(string input)
         {
@@ -378,13 +383,9 @@ namespace Supremes.Parsers
         internal bool ContainsIgnoreCase(string seq)
         {
             // used to check presence of </title>, </style>. only finds consistent case.
-#if (NETSTANDARD1_3)
             string loScan = seq.ToLowerInvariant();
             string hiScan = seq.ToUpperInvariant();
-#else
-            string loScan = seq.ToLower(CultureInfo.InvariantCulture);
-            string hiScan = seq.ToUpper(CultureInfo.InvariantCulture);
-#endif
+
             return (NextIndexOf(loScan) > -1) || (NextIndexOf(hiScan) > -1);
         }
 
@@ -392,5 +393,48 @@ namespace Supremes.Parsers
         {
             return input.Substring(pos, length - pos);
         }
+        
+        private static string CacheString(char[] charBuf, string[] stringCache, int start, int count) {
+            // limit (no cache):
+            if (count > maxStringCacheLen)
+                return new string(charBuf, start, count);
+            if (count < 1)
+                return "";
+
+            // calculate hash:
+            int hash = 0;
+            for (int i = 0; i < count; i++) {
+                hash = 31 * hash + charBuf[start + i];
+            }
+
+            // get from cache
+            int index = hash & (stringCacheSize - 1);
+            string cached = stringCache[index];
+
+            if (cached != null && RangeEquals(charBuf, start, count, cached)) // positive hit
+                return cached;
+            else {
+                cached = new string(charBuf, start, count);
+                stringCache[index] = cached; // add or replace, assuming most recently used are most likely to recur next
+            }
+
+            return cached;
+        }
+
+        private static bool RangeEquals(char[] charBuf, int start, int count, string cached) {
+            if (cached.Length != count) {
+                return false;
+            }
+
+            for (int i = 0; i < count; i++) {
+                if (charBuf[start + i] != cached[i]) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
+    
+    
 }
