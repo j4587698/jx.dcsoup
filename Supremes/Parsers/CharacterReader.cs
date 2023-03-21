@@ -1,5 +1,8 @@
-﻿using Supremes.Helper;
+﻿using System;
+using System.Collections.Generic;
+using Supremes.Helper;
 using System.Globalization;
+using System.IO;
 
 namespace Supremes.Parsers
 {
@@ -9,33 +12,142 @@ namespace Supremes.Parsers
     /// <remarks>
     /// To replace the old TokenQueue.
     /// </remarks>
-    internal class CharacterReader
+    public class CharacterReader
     {
         internal const char EOF = '\uffff';
         
         private const int maxStringCacheLen = 12;
+        public const int maxBufferLen = 1024 * 32;
+        public const int readAheadLimit = (int)(maxBufferLen * 0.75);
+        private const int minReadAheadLen = 1024;
 
-        private readonly string input;
-
-        private readonly int length;
-
-        private int pos = 0;
-
-        private int mark = 0;
-        
+        private char[] charBuf;
+        private StreamReader reader;
+        private int bufLength;
+        private int bufSplitPoint;
+        private int bufPos;
+        private int readerPos;
+        private int bufMark = -1;
         private const int stringCacheSize = 512;
-        private string[] stringCache = new string[stringCacheSize]; // 在此文档中保存重用的字符串，以减少垃圾。
+        private string[] stringCache = new string[stringCacheSize];
 
-        internal CharacterReader(string input)
-        {
+        private List<int>? newlinePositions = null;
+        private int lineNumberOffset = 1;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="input"></param>
+        /// <param name="sz"></param>
+        public CharacterReader(StreamReader input, int sz) {
             Validate.NotNull(input);
-            this.input = input;
-            this.length = this.input.Length;
+            Validate.IsTrue(input.BaseStream.CanSeek);
+            reader = input;
+            charBuf = new Char[Math.Min(sz, maxBufferLen)];
+            BufferUp();
+        }
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="input"></param>
+        public CharacterReader(string input): this(new StreamReader(new StringReader(input)), maxBufferLen)
+        {
+        }
+        
+        private bool readFully; // if the underlying stream has been completely read, no value in further buffering
+        
+        private void BufferUp()
+        {
+            if (readFully || bufPos < bufSplitPoint)
+                return;
+            
+            int pos;
+            int offset;
+            if (bufMark != -1)
+            {
+                pos = bufMark;
+                offset = bufPos - bufMark;
+            }
+            else
+            {
+                pos = bufPos;
+                offset = 0;
+            }
+
+            try
+            {
+                long skipped = reader.BaseStream.Seek(pos, SeekOrigin.Begin);
+                var position = reader.BaseStream.Position;
+
+                int read = 0;
+                while (read <= minReadAheadLen)
+                {
+                    int remaining = charBuf.Length - read;
+                    int thisRead = reader.Read(charBuf, read, remaining);
+                    if (thisRead == 0)
+                    {
+                        readFully = true;
+                        break;
+                    }
+                    
+                    read += thisRead;
+                }
+
+                reader.BaseStream.Seek(position, SeekOrigin.Begin);
+
+                if (read > 0)
+                {
+                    Validate.IsTrue(skipped == pos); // Previously asserted that there is room in buf to skip, so this will be a WTF
+                    bufLength = read;
+                    readerPos += pos;
+                    bufPos = offset;
+                    if (bufMark != -1)
+                        bufMark = 0;
+                    bufSplitPoint = Math.Min(bufLength, readAheadLimit);
+                }
+            }
+            catch (IOException e)
+            {
+                throw new UncheckedIOException(e);
+            }
+
+            ScanBufferForNewlines(); // if enabled, we index newline positions for line number tracking
+            lastIcSeq = null; // cache for last containsIgnoreCase(seq)
         }
 
-        internal int Pos()
+        public int Pos()
         {
             return pos;
+        }
+        
+        public bool IsTrackNewlines => newlinePositions != null;
+        
+        private int LineNumIndex(int pos) {
+            if (!IsTrackNewlines) return 0;
+            int i = newlinePositions.BinarySearch(pos);
+            if (i < -1) i = Math.Abs(i) - 2;
+            return i;
+        }
+        
+        private void ScanBufferForNewlines() {
+            if (!IsTrackNewlines)
+                return;
+
+            if (newlinePositions.Count > 0) {
+                // work out the line number that we have read up to (as we have likely scanned past this point)
+                int index = LineNumIndex(readerPos);
+                if (index == -1) index = 0; // first line
+                int linePos = newlinePositions.get(index);
+                lineNumberOffset += index; // the num lines we've read up to
+                newlinePositions.Clear();
+                newlinePositions.Add(linePos); // roll the last read pos to first, for cursor num after buffer
+            }
+
+            for (int i = bufPos; i < bufLength; i++) {
+                if (charBuf[i] == '\n')
+                    newlinePositions.Add(1 + readerPos + i);
+            }
         }
 
         internal bool IsEmpty()
@@ -379,6 +491,12 @@ namespace Supremes.Parsers
                 return false;
             }
         }
+        
+        // we maintain a cache of the previously scanned sequence, and return that if applicable on repeated scans.
+        // that improves the situation where there is a sequence of <p<p<p<p<p<p<p...</title> and we're bashing on the <p
+        // looking for the </title>. Resets in bufferUp()
+        private string lastIcSeq; // scan cache
+        private int lastIcIndex; // nearest found indexOf
 
         internal bool ContainsIgnoreCase(string seq)
         {

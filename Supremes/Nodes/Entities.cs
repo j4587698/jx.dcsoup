@@ -28,6 +28,9 @@ namespace Supremes.Nodes
             Extended
         }
         
+        internal const int codepointRadix = 36;
+        private static readonly char[] codeDelims = new char[] {',', ';' };
+
         private static readonly IDictionary<string, Utf32> full;
 
         private static readonly IDictionary<string, int> xhtml;
@@ -210,16 +213,11 @@ namespace Supremes.Nodes
         static Entities()
         {
             // xhtml has restricted entities
-            xhtmlByVal = new Dictionary<Utf32, string>()
-            {
-                { 0x0022, "quat" },
-                { 0x0026, "amp" },
-                { 0x003C, "lt" },
-                { 0x003E, "gt" },
-            };
-            @base = LoadEntities("entities-base.properties"); // most common / default
+            xhtml = LoadEntities(EscapeMode.Xhtml, EntitiesData.xmlPoints, 4); // xhtml entities
+            xhtmlByVal = ToCharacterKey(xhtml);
+            @base = LoadEntities(EscapeMode.Base, EntitiesData.basePoints, 106); // most common / default
             baseByVal = ToCharacterKey(@base);
-            full = LoadEntities("entities-full.properties"); // extended and overblown.
+            full = LoadEntities(EscapeMode.Extended, EntitiesData.fullPoints, 2125); // extended and overblown.
             fullByVal = ToCharacterKey(full);
         }
 
@@ -231,7 +229,10 @@ namespace Supremes.Nodes
             {
                 while (!reader.IsEmpty())
                 {
-                
+                    var name = reader.ConsumeTo('=');
+                    reader.Advance();
+                    
+                    var cp1 = Convert.ToInt32(reader.ConsumeToAny(codeDelims), codepointRadix);
                 }
             }
             finally
