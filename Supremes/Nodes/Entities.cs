@@ -233,6 +233,9 @@ namespace Supremes.Nodes
                     reader.Advance();
                     
                     var cp1 = Convert.ToInt32(reader.ConsumeToAny(codeDelims), codepointRadix);
+                    var codeDelim = reader.Current();
+                    reader.Advance();
+                    
                 }
             }
             finally

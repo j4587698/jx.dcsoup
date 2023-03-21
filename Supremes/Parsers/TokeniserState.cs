@@ -2706,7 +2706,7 @@
 
         internal abstract void Read(Tokeniser t, CharacterReader r);
 
-        private const char nullChar = '\u0000';
+        internal const char nullChar = '\u0000';
 
         private const char replacementChar = Tokeniser.replacementChar;
 
