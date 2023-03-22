@@ -42,7 +42,7 @@ namespace Supremes.Fluent
         /// <param name="escapeMode">the new escape mode to use</param>
         /// <returns>The input <see cref="DocumentOutputSettings"/>, for method chaining.</returns>
         /// <seealso cref="DocumentOutputSettings.EscapeMode">DocumentOutputSettings.EscapeMode</seealso>
-        public static DocumentOutputSettings EscapeMode(this DocumentOutputSettings self, DocumentEscapeMode escapeMode)
+        public static DocumentOutputSettings EscapeMode(this DocumentOutputSettings self, Entities.EscapeMode escapeMode)
         {
             self.EscapeMode = escapeMode;
             return self;

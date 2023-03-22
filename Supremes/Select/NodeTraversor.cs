@@ -24,13 +24,13 @@ namespace Supremes.Select
             while (node != null)
             {
                 Node parent = node.parentNode; // remember parent to find nodes that get replaced in .head
-                int origSize = parent?.ChildNodeSize ?? 0;
+                int origSize = parent?.ChildNodeSize() ?? 0;
                 Node next = node.NextSibling;
 
                 visitor.Head(node, depth); // visit current node
                 if (parent != null && !node.HasParent()) // removed or replaced
                 {
-                    if (origSize == parent.ChildNodeSize) // replaced
+                    if (origSize == parent.ChildNodeSize()) // replaced
                     {
                         node = parent.ChildNode(node.SiblingIndex); // replace ditches parent but keeps sibling index
                     }
@@ -46,7 +46,7 @@ namespace Supremes.Select
                     }
                 }
 
-                if (node.ChildNodeSize > 0) // descend
+                if (node.ChildNodeSize() > 0) // descend
                 {
                     node = node.ChildNode(0);
                     depth++;
@@ -88,7 +88,7 @@ namespace Supremes.Select
                 if (result == NodeFilter.FilterResult.Stop)
                     return result;
                 // Descend into child nodes:
-                if (result == NodeFilter.FilterResult.Continue && node.ChildNodeSize > 0)
+                if (result == NodeFilter.FilterResult.Continue && node.ChildNodeSize() > 0)
                 {
                     node = node.ChildNode(0);
                     ++depth;

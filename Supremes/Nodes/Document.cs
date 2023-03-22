@@ -2,28 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Supremes.Parsers;
 
 namespace Supremes.Nodes
 {
-    /// <summary>
-    /// Specifies the document's current HTML escape mode.
-    /// </summary>
-    public enum DocumentEscapeMode
-    {
-        /// <summary>
-        /// Restricted entities suitable for XHTML output: lt, gt, amp, and quot only.
-        /// </summary>
-        Xhtml,
-        /// <summary>
-        /// Default HTML output entities.
-        /// </summary>
-        Base,
-        /// <summary>
-        /// Complete HTML entities.
-        /// </summary>
-        Extended
-    }
 
     /// <summary>
     /// Specifies the output serialization syntax.
@@ -64,19 +47,11 @@ namespace Supremes.Nodes
     /// </summary>
     public sealed class DocumentOutputSettings
     {
-        private DocumentEscapeMode escapeMode = DocumentEscapeMode.Base;
-
-        private Encoding charset = Encoding.UTF8;
-
         //private CharsetEncoder charsetEncoder = charset.NewEncoder();
 
-        private bool prettyPrint = true;
-
-        private bool outline = false;
-
         private int indentAmount = 1;
-
-        private DocumentSyntax syntax = DocumentSyntax.Html;
+        
+        private readonly ThreadLocal<CharsetEncoder> encoderThreadLocal = new ThreadLocal<CharsetEncoder>(); // initialized by start of OuterHtmlVisitor
 
         internal DocumentOutputSettings()
         {
@@ -103,11 +78,7 @@ namespace Supremes.Nodes
         /// <value>the new escape mode to use</value>
         /// <returns>the document's current escape mode</returns>
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
-        public DocumentEscapeMode EscapeMode
-        {
-            get { return escapeMode; }
-            set { escapeMode = value; }
-        }
+        public Entities.EscapeMode EscapeMode { get; set; } = Entities.EscapeMode.Base;
 
         /// <summary>
         /// Get or Set the document's current output charset, 
@@ -128,11 +99,7 @@ namespace Supremes.Nodes
         /// <value>the new charset to use</value>
         /// <returns>the document's current charset</returns>
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
-        public Encoding Charset
-        {
-            get { return charset; }
-            set { charset = value; }
-        }
+        public Encoding Charset { get; set; } = Encoding.UTF8;
 
         /// <summary>
         /// Get or Set the document's current output syntax.
@@ -149,11 +116,7 @@ namespace Supremes.Nodes
         /// <value>serialization syntax</value>
         /// <returns>current syntax</returns>
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
-        public DocumentSyntax Syntax
-        {
-            get { return syntax; }
-            set { syntax = value; }
-        }
+        public DocumentSyntax Syntax { get; set; } = DocumentSyntax.Html;
 
         /// <summary>
         /// Get or Set if pretty printing is enabled.
@@ -170,11 +133,7 @@ namespace Supremes.Nodes
         /// <value>new pretty print setting</value>
         /// <returns>if pretty printing is enabled.</returns>
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
-        public bool PrettyPrint
-        {
-            get { return prettyPrint; }
-            set { prettyPrint = value; }
-        }
+        public bool PrettyPrint { get; set; } = true;
 
         /// <summary>
         /// Get or Set if outline mode is enabled.
@@ -191,11 +150,7 @@ namespace Supremes.Nodes
         /// <value>new outline setting</value>
         /// <returns>true if outline mode is enabled</returns>
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
-        public bool Outline
-        {
-            get { return outline; }
-            set { outline = value; }
-        }
+        public bool Outline { get; set; } = false;
 
         /// <summary>
         /// Get or Set the current tag indent amount, used when pretty printing.
@@ -208,21 +163,33 @@ namespace Supremes.Nodes
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
         public int IndentAmount
         {
-            get { return indentAmount; }
+            get => indentAmount;
             set
             {
                 Validate.IsTrue(indentAmount >= 0);
                 indentAmount = value;
             }
         }
+        
+        internal Entities.CoreCharset CoreCharset { get; set; }
+
+        internal CharsetEncoder Encoder => encoderThreadLocal.Value ?? PrepareEncoder();
+
+        internal CharsetEncoder PrepareEncoder() {
+            // Created at the start of OuterHtmlVisitor so each pass has its own encoder, allowing OutputSettings to be shared among threads
+            CharsetEncoder encoder = new CharsetEncoder(Charset);
+            encoderThreadLocal.Value = encoder;
+            CoreCharset = Entities.CoreCharsetByName(encoder.CharsetName);
+            return encoder;
+        }
 
         internal DocumentOutputSettings Clone()
         {
             DocumentOutputSettings clone;
             clone = (DocumentOutputSettings)this.MemberwiseClone();
-            clone.Charset = charset;
+            clone.Charset = Charset;
             // new charset and charset encoder
-            clone.escapeMode = escapeMode;
+            clone.EscapeMode = EscapeMode;
             // indentAmount, prettyPrint are primitives so object.clone() will handle
             return clone;
         }
@@ -348,7 +315,7 @@ namespace Supremes.Nodes
         public Element CreateElement(string tagName)
         {
             Tag tag = Supremes.Nodes.Tag.ValueOf(tagName);
-            return new Element(tag, this.BaseUri);
+            return new Element(tag, this.BaseUri());
         }
 
         /// <summary>
@@ -388,7 +355,7 @@ namespace Supremes.Nodes
 
         private void NormaliseTextNodes(Element element)
         {
-            List<Node> toMove = element.childNodes
+            List<Node> toMove = element.ChildNodes()
                 .OfType<TextNode>()
                 .Where(n => !n.IsBlank)
                 .Cast<Node>()
@@ -416,7 +383,7 @@ namespace Supremes.Nodes
                 for (int i = 1; i < elements.Count; i++)
                 {
                     Node dupe = elements[i];
-                    foreach (Node node in dupe.ChildNodes)
+                    foreach (Node node in dupe.ChildNodes())
                     {
                         toMove.Add(node);
                     }
@@ -445,7 +412,7 @@ namespace Supremes.Nodes
             }
             else
             {
-                foreach (Node child in node.ChildNodes)
+                foreach (Node child in node.ChildNodes())
                 {
                     Element found = FindFirstElementByTagName(tag, child);
                     if (found != null)

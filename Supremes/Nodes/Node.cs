@@ -182,7 +182,7 @@ namespace Supremes.Nodes
         /// Update the base URI of this node and all of its descendants.
         /// </summary>
         /// <param name="baseUri">base URI to set</param>
-        public void setBaseUri(string baseUri) {
+        public void SetBaseUri(string baseUri) {
             Validate.NotNull(baseUri);
             DoSetBaseUri(baseUri);
         }
@@ -225,10 +225,10 @@ namespace Supremes.Nodes
         public virtual string AbsUrl(string attributeKey)
         {
             Validate.NotEmpty(attributeKey);
-            if (!(HasAttributes() && Attributes().HasKeyIgnoreCase(attributeKey))) // not using hasAttr, so that we don't recurse down hasAttr->absUrl
+            if (!(HasAttributes() && Attributes.ContainsKeyIgnoreCase(attributeKey))) // not using hasAttr, so that we don't recurse down hasAttr->absUrl
                 return "";
 
-            return StringUtil.Resolve(BaseUri(), Attributes().GetIgnoreCase(attributeKey));
+            return StringUtil.Resolve(BaseUri(), Attributes.GetIgnoreCase(attributeKey));
         }
         
         /// <summary>
@@ -261,13 +261,13 @@ namespace Supremes.Nodes
         /// <returns>list of children. If no children, returns an empty list.</returns>
         public IList<Node> ChildNodes()
         {
-            if (ChildNodeSize == 0)
+            if (ChildNodeSize() == 0)
                 return EmptyNodes;
 
             List<Node> children = EnsureChildNodes();
             List<Node> rewrap = new List<Node>(children.Count); // wrapped so that looping and moving will not throw a CME as the source changes
             rewrap.AddRange(children);
-            return rewrap;
+            return rewrap.AsReadOnly();
         }
 
         /// <summary>
@@ -384,6 +384,10 @@ namespace Supremes.Nodes
         {
             Validate.NotNull(node);
             Validate.NotNull(parentNode);
+            if (node.parentNode == parentNode)
+            {
+                node.Remove();
+            }
             parentNode.AddChildren(SiblingIndex, node);
             return this;
         }
@@ -410,6 +414,10 @@ namespace Supremes.Nodes
         {
             Validate.NotNull(node);
             Validate.NotNull(parentNode);
+            if (node.parentNode == parentNode)
+            {
+                node.Remove();
+            }
             parentNode.AddChildren(SiblingIndex + 1, node);
             return this;
         }
@@ -419,7 +427,7 @@ namespace Supremes.Nodes
             Validate.NotNull(html);
             Validate.NotNull(parentNode);
             Element context = Parent as Element;
-            IReadOnlyList<Node> nodes = Parser.ParseFragment(html, context, BaseUri);
+            IReadOnlyList<Node> nodes = NodeUtils.Parser(this).ParseFragmentInput(html, context, BaseUri());
             parentNode.AddChildren(index, nodes.ToArray());
         }
 
@@ -435,26 +443,29 @@ namespace Supremes.Nodes
         public Node Wrap(string html)
         {
             Validate.NotEmpty(html);
-            Element context = Parent as Element;
-            IReadOnlyList<Node> wrapChildren = Parser.ParseFragment(html, context, BaseUri);
+            Element context = Parent as Element ?? this as Element;
+            IReadOnlyList<Node> wrapChildren = NodeUtils.Parser(this).ParseFragmentInput(html, context, BaseUri());
             Node wrapNode = wrapChildren[0];
-            if (wrapNode == null || !(wrapNode is Element))
+            if (!(wrapNode is Element wrap))
             {
                 // nothing to wrap with; noop
-                return null;
+                return this;
             }
-            Element wrap = (Element)wrapNode;
             Element deepest = GetDeepChild(wrap);
-            parentNode.ReplaceChild(this, wrap);
-            ((Supremes.Nodes.Node)deepest).AddChildren(this);
+            parentNode?.ReplaceChild(this, wrap);
+            deepest.AddChildren(this); // side effect of tricking wrapChildren to lose first
             // remainder (unbalanced wrap, like <div></div><p></p> -- The <p> is remainder
             if (wrapChildren.Count > 0)
             {
                 for (int i = 0; i < wrapChildren.Count; i++)
                 {
                     Node remainder = (Node)wrapChildren[i];
-                    remainder.parentNode.RemoveChild(remainder);
-                    wrap.AppendChild(remainder);
+                    // if no parent, this could be the wrap node, so skip
+                    if (wrap == remainder)
+                        continue;
+
+                    remainder.parentNode?.RemoveChild(remainder);
+                    wrap.After(remainder);
                 }
             }
             return this;
@@ -489,24 +500,18 @@ namespace Supremes.Nodes
         public Node Unwrap()
         {
             Validate.NotNull(parentNode);
-            int index = siblingIndex;
-            Node firstChild = childNodes.Count > 0 ? childNodes[0] : null;
-            parentNode.AddChildren(index, this.ChildNodesAsArray());
+            Node firstChild = FirstChild();
+            parentNode.AddChildren(siblingIndex, this.ChildNodesAsArray());
             this.Remove();
             return firstChild;
         }
 
         private Element GetDeepChild(Element el)
         {
-            IList<Element> children = el.Children;
-            if (children.Count > 0)
-            {
-                return GetDeepChild(children[0]);
+            while (el.ChildrenSize() > 0) {
+                el = el.ChildElementsList().get(0);
             }
-            else
-            {
-                return el;
-            }
+            return el;
         }
 
         /// <summary>
@@ -637,7 +642,7 @@ namespace Supremes.Nodes
                 {
                     return null; // root
                 }
-                IList<Node> siblings = parentNode.childNodes;
+                IList<Node> siblings = parentNode.ChildNodes();
                 int index = SiblingIndex;
                 Validate.NotNull(index);
                 if (siblings.Count > index + 1)
@@ -663,7 +668,7 @@ namespace Supremes.Nodes
                 {
                     return null; // root
                 }
-                IList<Node> siblings = parentNode.childNodes;
+                IList<Node> siblings = parentNode.ChildNodes();
                 int index = SiblingIndex;
                 Validate.NotNull(index);
                 if (index > 0)
@@ -690,6 +695,28 @@ namespace Supremes.Nodes
             get { return siblingIndex; }
             internal set { siblingIndex = value; }
         }
+        
+        /// <summary>
+        /// Gets the first child node of this node, or {@code null} if there is none. This could be any Node type, such as an
+        /// Element, TextNode, Comment, etc. Use {@link Element#firstElementChild()} to get the first Element child.
+        /// </summary>
+        /// <returns>the first child node, or null if there are no children.</returns>
+        public Node FirstChild() {
+            if (ChildNodeSize() == 0) return null;
+            return EnsureChildNodes()[0];
+        }
+        
+        /// <summary>
+        /// Gets the last child node of this node, or {@code null} if there is none.
+        /// </summary>
+        /// <returns>the last child node, or null if there are no children.</returns>
+        public Node LastChild() {
+            int size = ChildNodeSize();
+            if (size == 0) return null;
+            List<Node> children = EnsureChildNodes();
+            return children[size - 1];
+        }
+
 
         /// <summary>
         /// Perform a depth-first traversal through this node and its descendants.

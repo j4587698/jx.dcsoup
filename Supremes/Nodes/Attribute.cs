@@ -1,5 +1,7 @@
 ﻿using Supremes.Helper;
 using System;
+using System.IO;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -91,42 +93,32 @@ namespace Supremes.Nodes
         /// e.g. <c>href="index.html"</c>.
         /// </remarks>
         /// <returns>HTML</returns>
-        public string Html
+        public string Html()
         {
-            get
+            StringBuilder sb = StringUtil.BorrowBuilder();
+
+            try
             {
-                StringBuilder accum = new StringBuilder();
-                AppendHtmlTo(accum, (new Document(string.Empty)).OutputSettings);
-                return accum.ToString();
+                Html(sb, (new Document("")).OutputSettings);
             }
+            catch (IOException exception)
+            {
+                throw new SerializationException(exception.Message);
+            }
+            return StringUtil.ReleaseBuilder(sb);
+        }
+        
+        protected void Html(StringBuilder accum, DocumentOutputSettings outSettings) {
+            Html(key, Value, accum, outSettings);
+        }
+        
+        protected static void Html(string key, string val, StringBuilder accum, DocumentOutputSettings outSettings)
+        {
+            key = GetValidKey(key, outSettings.Syntax);
+            if (key == null) return; // can't write it :(
+            HtmlNoValidate(key, val, accum, outSettings);
         }
 
-        internal void AppendHtmlTo(StringBuilder accum, DocumentOutputSettings @out)
-        {
-            accum.Append(key);
-            if (!ShouldCollapseAttribute(@out))
-            {
-                accum.Append("=\"");
-                Entities.Escape(accum, value, Convert(@out.EscapeMode), @out.Charset, true, false, false);
-                accum.Append('"');
-            }
-        }
-        
-        private static Entities.EscapeMode Convert(DocumentEscapeMode escapeMode)
-        {
-            switch (escapeMode)
-            {
-                case DocumentEscapeMode.Base:
-                    return Entities.EscapeMode.Base;
-                case DocumentEscapeMode.Extended:
-                    return Entities.EscapeMode.Extended;
-                case DocumentEscapeMode.Xhtml:
-                    return Entities.EscapeMode.Xhtml;
-                default:
-                    return Entities.EscapeMode.Base;
-            }
-        }
-        
         public static void HtmlNoValidate(string key, string val, StringBuilder accum, DocumentOutputSettings outputSettings)
         {
             accum.Append(key);
@@ -173,7 +165,7 @@ namespace Supremes.Nodes
         /// <returns>string</returns>
         public override string ToString()
         {
-            return Html;
+            return Html();
         }
 
         /// <summary>

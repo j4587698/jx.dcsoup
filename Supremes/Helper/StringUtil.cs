@@ -83,9 +83,9 @@ namespace Supremes.Helper
         /// </summary>
         /// <param name="c">UTF-16 character to test</param>
         /// <returns>true if UTF-16 character is whitespace, false otherwise</returns>
-        public static bool IsWhitespace(char c)
+        public static bool IsWhitespace(int c)
         {
-            return c == ' ' || c == '\t' || c == '\n' || c == '\f' || c == '\r';
+            return c is ' ' or '\t' or '\n' or '\f' or '\r';
         }
 
         /// <summary>
@@ -249,5 +249,59 @@ namespace Supremes.Helper
         }
         
         private static readonly ThreadLocal<Stack<StringBuilder>> threadLocalBuilders = new ThreadLocal<Stack<StringBuilder>>(() => new Stack<StringBuilder>());
+        
+        public static int ConvertToDecimal(string input, int sourceBase) {
+            string digits = "0123456789abcdefghijklmnopqrstuvwxyz";
+            input = input.ToLower();
+            int decimalValue = 0;
+            for (int i = 0; i < input.Length; i++) {
+                int digitValue = digits.IndexOf(input[i]);
+                if (digitValue < 0 || digitValue >= sourceBase) {
+                    throw new ArgumentException("Invalid digit: " + input[i]);
+                }
+                decimalValue = decimalValue * sourceBase + digitValue;
+            }
+
+            return decimalValue;
+        }
+        
+        /// <summary>
+        /// Maintains cached StringBuilders in a flyweight pattern, to minimize new StringBuilder GCs. The StringBuilder is
+        /// prevented from growing too large.
+        /// <p>
+        /// Care must be taken to release the builder once its work has been completed, with {@link #releaseBuilder}
+        /// </summary>
+        /// <returns>an empty StringBuilder</returns>
+        public static StringBuilder BorrowBuilder() {
+            Stack<StringBuilder> builders = threadLocalBuilders.Value;
+            return builders.Count == 0 ?
+                new StringBuilder(MaxCachedBuilderSize) :
+                builders.Pop();
+        }
+        
+        
+        public static string ReleaseBuilder(StringBuilder sb)
+        {
+            Validate.NotNull(sb);
+            
+            string result = sb.ToString();
+
+            if (sb.Length > MaxCachedBuilderSize)
+                sb = new StringBuilder(MaxCachedBuilderSize); // make sure it hasn't grown too big
+            else
+                sb.Clear(); // make sure it's emptied on release
+
+            Stack<StringBuilder> builders = threadLocalBuilders.Value;
+            builders.Push(sb);
+
+            while (builders.Count > MaxIdleBuilders)
+            {
+                builders.Pop();
+            }
+            return result;
+        }
+        
+        private const int MaxCachedBuilderSize = 8 * 1024;
+        private const int MaxIdleBuilders = 8;
     }
 }

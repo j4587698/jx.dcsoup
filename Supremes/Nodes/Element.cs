@@ -19,10 +19,22 @@ namespace Supremes.Nodes
     /// <author>Jonathan Hedley, jonathan@hedley.net</author>
     public class Element : Node
     {
+        private static readonly List<Element> EmptyChildren = new List<Element>();
+        private static readonly Regex ClassSplit = new Regex("\\s+");
+        private static readonly string BaseUriKey = Attributes.InternalKey("baseUri");
         private Tag tag;
+        private WeakReference<List<Element>> shadowChildrenRef; // points to child elements shadowed from node children
+        internal IList<Node> childNodes;
+        internal Attributes attributes; // field is nullable but all methods for attributes are non-null
 
-        private ICollection<string> classNames;
-
+        /// <summary>
+        /// Create a new, standalone element.
+        /// </summary>
+        /// <param name="tag"></param>
+        public Element(string tag): this(Tag.ValueOf(tag), string.Empty, null)
+        {
+        }
+        
         /// <summary>
         /// Create a new, standalone Element.
         /// </summary>
@@ -35,10 +47,15 @@ namespace Supremes.Nodes
         /// <seealso cref="AppendChild(Node)">AppendChild(Node)</seealso>
         /// <seealso cref="AppendElement(string)">AppendElement(string)</seealso>
         internal Element(Tag tag, string baseUri, Attributes attributes)
-            : base(baseUri, attributes)
         {
             Validate.NotNull(tag);
+            childNodes = EmptyNodes;
+            this.attributes = attributes;
             this.tag = tag;
+            if (baseUri != null)
+            {
+                this.SetBaseUri(baseUri);
+            }
         }
 
         /// <summary>
@@ -51,8 +68,21 @@ namespace Supremes.Nodes
         /// </param>
         /// <seealso cref="Supremes.Nodes.Tag.ValueOf(string)">Tag.ValueOf(string)</seealso>
         internal Element(Tag tag, string baseUri)
-            : this(tag, baseUri, new Attributes())
+            : this(tag, baseUri, null)
         {
+        }
+        
+        /// <summary>
+        /// Internal test to check if a nodelist object has been created.
+        /// </summary>
+        protected bool HasChildNodes => !Equals(childNodes, EmptyNodes);
+
+        protected override List<Node> EnsureChildNodes()
+        {
+            if (Equals(childNodes, EmptyNodes))
+            {
+                childNodes = new NodeList(this, 4);
+            }
         }
 
         internal override string NodeName

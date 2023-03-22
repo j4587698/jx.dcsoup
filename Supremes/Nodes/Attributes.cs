@@ -613,7 +613,7 @@ namespace Supremes.Nodes
             return dataPrefix + key;
         }
         
-        static String InternalKey(String key) {
+        internal static String InternalKey(String key) {
             return InternalPrefix + key;
         }
 
