@@ -32,9 +32,4 @@ API reference is available at: https://raw.githubusercontent.com/matarillo/dcsou
     <None Remove="Helper\entities-full.properties" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="Helper\entities-base.properties" />
-    <EmbeddedResource Include="Helper\entities-full.properties" />
-  </ItemGroup>
-
 </Project>

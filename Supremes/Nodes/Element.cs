@@ -24,7 +24,7 @@ namespace Supremes.Nodes
         private static readonly string BaseUriKey = Attributes.InternalKey("baseUri");
         private Tag tag;
         private WeakReference<List<Element>> shadowChildrenRef; // points to child elements shadowed from node children
-        internal IList<Node> childNodes;
+        internal List<Node> childNodes;
         internal Attributes attributes; // field is nullable but all methods for attributes are non-null
 
         /// <summary>
@@ -77,18 +77,46 @@ namespace Supremes.Nodes
         /// </summary>
         protected bool HasChildNodes => !Equals(childNodes, EmptyNodes);
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         protected override List<Node> EnsureChildNodes()
         {
             if (Equals(childNodes, EmptyNodes))
             {
                 childNodes = new NodeList(this, 4);
             }
+
+            return childNodes;
         }
 
-        internal override string NodeName
+        protected override bool HasAttributes => attributes != null;
+
+        public override Attributes Attributes
         {
-        	get { return tag.Name; }
+            get
+            {
+                attributes ??= new Attributes();
+                return attributes;
+            }
         }
+
+        public override string BaseUri => SearchUpForAttribute(this, BaseUriKey);
+        
+        private static string SearchUpForAttribute(Element start, string key) {
+            Element el = start;
+            while (el != null) {
+                if (el.attributes != null && el.attributes.ContainsKey(key))
+                    return el.attributes[key];
+                el = el.Parent;
+            }
+            return "";
+        }
+
+        public override int ChildNodeSize => childNodes.Count;
+
+        internal override string NodeName => tag.Name;
 
         /// <summary>
         /// Get or Set the name of the tag for this element.
@@ -110,11 +138,11 @@ namespace Supremes.Nodes
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
         public string TagName
         {
-            get { return tag.Name; }
+            get => tag.Name;
             set
             {
                 Validate.NotEmpty(value, "Tag name must not be empty.");
-                tag = Supremes.Nodes.Tag.ValueOf(value);
+                tag = Tag.ValueOf(value, NodeUtils.Parser(this).set);
             }
         }
 
@@ -1677,6 +1705,19 @@ namespace Supremes.Nodes
             clone.classNames = null;
             // derived on first hit, otherwise gets a pointer to source classnames
             return clone;
+        }
+        
+        private class NodeList: List<Node>
+        {
+            private readonly Element owner;
+
+            public NodeList(Element owner, int initialCapacity) : base(initialCapacity) {
+                this.owner = owner;
+            }
+
+            public void OnContentsChanged() {
+                owner.NodelistChanged();
+            }
         }
     }
 }

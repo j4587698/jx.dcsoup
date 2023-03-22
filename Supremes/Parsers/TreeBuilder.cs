@@ -15,16 +15,26 @@ namespace Supremes.Parsers
 
         internal Document doc;
 
-        internal DescendableLinkedList<Element> stack;
+        internal List<Element> stack;
 
         internal string baseUri;
 
         internal Token currentToken;
 
         internal ParseErrorList errors;
+        
+        internal ParseSettings settings;
 
-        internal abstract IReadOnlyList<Node> ParseFragment(string inputFragment, Element context, string baseUri, Parser parser);
+        internal Dictionary<string, Token.Tag> seenTags;
 
+        private Token.StartTag start = new Token.StartTag();
+        
+        private Token.EndTag end = new Token.EndTag();
+        
+        internal abstract ParseSettings DefaultSettings { get; }
+        
+        private bool trackSourceRange;  // optionally tracks the source range of nodes
+        
         // current doc we are building into
         // the stack of open elements
         // current base uri, for creating new elements
@@ -34,11 +44,18 @@ namespace Supremes.Parsers
         {
             Validate.NotNull(input, "String input must not be null");
             Validate.NotNull(baseUri, "BaseURI must not be null");
+            Validate.NotNull(parser);
+            
             doc = new Document(baseUri);
+            doc.Parser = parser;
+            settings = parser.Settings;
             reader = new CharacterReader(input);
             this.parser = parser;
-            tokeniser = new Tokeniser(reader, errors);
-            stack = new DescendableLinkedList<Element>();
+            trackSourceRange = parser.IsTrackPosition;
+            reader.TrackNewlines(parser.IsTrackErrors || trackSourceRange);
+            tokeniser = new Tokeniser(reader, parser.Errors);
+            stack = new List<Element>(32);
+            seenTags = new Dictionary<string, Token.Tag>();
             this.baseUri = baseUri;
         }
 
@@ -54,6 +71,8 @@ namespace Supremes.Parsers
             return doc;
         }
 
+        internal abstract IReadOnlyList<Node> ParseFragment(string inputFragment, Element context, string baseUri, Parser parser);
+        
         internal void RunParser()
         {
             while (true)

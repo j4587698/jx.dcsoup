@@ -11,7 +11,7 @@ namespace Supremes.Parsers
 #if (!NETSTANDARD2_0_OR_GREATER)
     [Serializable]
 #endif
-    internal class ParseErrorList : List<ParseError>
+    public class ParseErrorList : List<ParseError>
     {
         private const long serialVersionUID = 1L;
 

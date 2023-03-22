@@ -15,13 +15,11 @@ namespace Supremes.Parsers
     /// </summary>
     public class Parser
     {
-        private const int DEFAULT_MAX_ERRORS = 0;
-
         private TreeBuilder treeBuilder;
 
-        private int maxErrors = DEFAULT_MAX_ERRORS;
-
         private ParseErrorList errors;
+
+        private bool trackPosition = false;
 
         /// <summary>
         /// Create a new Parser, using the specified TreeBuilder
@@ -31,6 +29,7 @@ namespace Supremes.Parsers
         {
             // by default, error tracking is disabled.
             this.treeBuilder = treeBuilder;
+            Settings = treeBuilder.DefaultSettings;
         }
 
         /// <summary>
@@ -84,7 +83,7 @@ namespace Supremes.Parsers
         /// <returns>this, for chaining</returns>
         public Parser SetTrackErrors(int maxErrors)
         {
-            this.maxErrors = maxErrors;
+            errors = maxErrors > 0 ? ParseErrorList.Tracking(maxErrors) : ParseErrorList.NoTracking();
             return this;
         }
 
@@ -92,7 +91,7 @@ namespace Supremes.Parsers
         /// Retrieve the parse errors, if any, from the last parse.
         /// </summary>
         /// <returns>list of parse errors, up to the size of the maximum errors tracked.</returns>
-        public IList<ParseError> Errors => errors;
+        public ParseErrorList Errors => errors;
 
         // builders
 
@@ -116,6 +115,27 @@ namespace Supremes.Parsers
         /// <returns>a new simple XML parser.</returns>
         public static Parser XmlParser => new Parser(new XmlTreeBuilder());
 
+        /// <summary>
+        /// Check if parse error tracking is enabled.
+        /// </summary>
+        public bool IsTrackErrors => errors.MaxSize > 0;
+
+        /// <summary>
+        /// Enable or disable source position tracking. If enabled, Nodes will have a Position to track where in the original
+        /// input source they were created from.
+        /// </summary>
+        public bool IsTrackPosition
+        {
+            get => trackPosition;
+            set => trackPosition = value;
+        }
+        
+        /// <summary>
+        /// Get / Set the ParseSettings of this Parser, to control the case sensitivity of tags and attributes.
+        /// </summary>
+        public ParseSettings Settings { get; set; }
+
+        
         // utility methods
         
         /// <summary>

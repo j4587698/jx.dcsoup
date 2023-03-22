@@ -20,7 +20,7 @@ namespace Supremes.Nodes
     {
         internal Node parentNode;
 
-        internal IList<Node> EmptyNodes = new List<Node>();
+        internal List<Node> EmptyNodes = new List<Node>();
 
         internal Attributes attributes;
 
@@ -46,14 +46,12 @@ namespace Supremes.Nodes
         internal abstract string NodeName { get; }
         
         /// Check if this Node has an actual Attributes object.
-        protected abstract bool HasAttributes();
+        protected abstract bool HasAttributes { get; }
         
         /// Checks if this node has a parent. Nodes won't have parents if (e.g.) they are newly created and not added as a child
         /// to an existing node, or if they are a {@link #shallowClone()}. In such cases, {@link #parent()} will return {@code null}.
         /// @return if this node has a parent.
-        public bool HasParent() {
-            return parentNode != null;
-        }
+        public virtual bool HasParent => parentNode != null;
 
         /// <summary>
         /// Get an attribute's value by its key.
@@ -102,10 +100,7 @@ namespace Supremes.Nodes
         ///  Get the number of attributes that this Node has.
         /// </summary>
         /// <returns>the number of attributes</returns>
-        public int AttributesSize() {
-            // added so that we can test how many attributes exist without implicitly creating the Attributes object
-            return HasAttributes() ? Attributes.Count : 0;
-        }
+        public virtual int AttributesSize => HasAttributes() ? Attributes.Count : 0;
 
         /// <summary>
         /// Set an attribute (key=value).
@@ -159,7 +154,7 @@ namespace Supremes.Nodes
         /// <returns>this, for chaining</returns>
         public Node ClearAttributes()
         {
-            if (HasAttributes())
+            if (HasAttributes)
             {
                 Attributes.Clear();
             }
@@ -170,7 +165,7 @@ namespace Supremes.Nodes
         ///  Get the base URI that applies to this node. Will return an empty string if not defined. Used to make relative links
         /// absolute.
         /// </summary>
-        public abstract string BaseUri();
+        public abstract string BaseUri { get; }
         
         /// <summary>
         /// Set the baseUri for just this node (not its descendants), if this Node tracks base URIs.
@@ -225,10 +220,10 @@ namespace Supremes.Nodes
         public virtual string AbsUrl(string attributeKey)
         {
             Validate.NotEmpty(attributeKey);
-            if (!(HasAttributes() && Attributes.ContainsKeyIgnoreCase(attributeKey))) // not using hasAttr, so that we don't recurse down hasAttr->absUrl
+            if (!(HasAttributes && Attributes.ContainsKeyIgnoreCase(attributeKey))) // not using hasAttr, so that we don't recurse down hasAttr->absUrl
                 return "";
 
-            return StringUtil.Resolve(BaseUri(), Attributes.GetIgnoreCase(attributeKey));
+            return StringUtil.Resolve(BaseUri, Attributes.GetIgnoreCase(attributeKey));
         }
         
         /// <summary>
@@ -292,18 +287,15 @@ namespace Supremes.Nodes
         /// Get the number of child nodes that this node holds.
         /// </summary>
         /// <returns>the number of child nodes that this node holds.</returns>
-        public abstract int ChildNodeSize();
+        public abstract int ChildNodeSize { get; }
 
-        internal Node[] ChildNodesAsArray()
-        {
-            return EnsureChildNodes().ToArray();
-        }
+        internal Node[] ChildNodesAsArray => EnsureChildNodes().ToArray();
         
         /// <summary>
         ///  Delete all this node's children.
         /// </summary>
         /// <returns>this node, for chaining</returns>
-        public abstract Node Empty();
+        public abstract Node Empty { get; }
 
         /// <summary>
         /// Gets this node's parent node.

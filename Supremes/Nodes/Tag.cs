@@ -1,5 +1,7 @@
 ﻿using Supremes.Helper;
 using System.Collections.Generic;
+using Supremes.Internal;
+using Supremes.Parsers;
 
 namespace Supremes.Nodes
 {
@@ -12,6 +14,8 @@ namespace Supremes.Nodes
         private static readonly IDictionary<string, Tag> tags = new Dictionary<string, Tag>();
 
         private string tagName;
+        
+        private string normalName; // always the lower case version of this tag, regardless of case preservation mode
 
         private bool isBlock = true;
 
@@ -43,16 +47,47 @@ namespace Supremes.Nodes
             // for pre, textarea, script etc
             // a control that appears in forms: input, textarea, output etc
             // a control that can be submitted in a form: input etc
-            this.tagName = tagName.ToLower();
+            this.tagName = tagName;
+            normalName = Normalizer.LowerCase(this.tagName);
         }
 
         /// <summary>
         /// Get this tag's name.
         /// </summary>
         /// <returns>the tag's name</returns>
-        public string Name
-        {
-            get { return tagName; }
+        public string Name => tagName;
+        
+        /// <summary>
+        /// Get this tag's normalized (lowercased) name.
+        /// </summary>
+        public string NormalName => normalName;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="tagName"></param>
+        /// <param name="settings"></param>
+        /// <returns></returns>
+        public static Tag ValueOf(string tagName, ParseSettings settings) {
+            Validate.NotNull(tagName);
+            Tag tag = tags[tagName];
+
+            if (tag == null) {
+                tagName = settings.NormalizeTag(tagName); // the name we'll use
+                Validate.NotEmpty(tagName);
+                string normalName = Normalizer.LowerCase(tagName); // the lower-case name to get tag settings off
+                tag = tags[normalName];
+
+                if (tag == null) {
+                    // not defined: create default; go anywhere, do anything! (incl be inside a <p>)
+                    tag = new Tag(tagName);
+                    tag.isBlock = false;
+                } else if (settings.PreserveTagCase && !tagName.Equals(normalName))  {
+                    tag = tag.MemberwiseClone() as Tag; // get a new version vs the static one, so name update doesn't reset all
+                    tag.tagName = tagName;
+                }
+            }
+            return tag;
         }
 
         /// <summary>
@@ -65,96 +100,58 @@ namespace Supremes.Nodes
         /// </remarks>
         /// <param name="tagName">Name of tag, e.g. "p". Case insensitive.</param>
         /// <returns>The tag, either defined or new generic.</returns>
-        public static Supremes.Nodes.Tag ValueOf(string tagName)
+        public static Tag ValueOf(string tagName)
         {
-            Validate.NotNull(tagName);
-            Supremes.Nodes.Tag tag;
-            if (!tags.TryGetValue(tagName, out tag))
-            {
-                tagName = tagName.Trim().ToLower();
-                Validate.NotEmpty(tagName);
-                if (!tags.TryGetValue(tagName, out tag))
-                {
-                    // not defined: create default; go anywhere, do anything! (incl be inside a <p>)
-                    tag = new Supremes.Nodes.Tag(tagName);
-                    tag.isBlock = false;
-                    tag.canContainBlock = true;
-                }
-            }
-            return tag;
+            return ValueOf(tagName, ParseSettings.PreserveCase);
         }
 
         /// <summary>
         /// Gets if this is a block tag.
         /// </summary>
         /// <returns>if block tag</returns>
-        public bool IsBlock
-        {
-            get { return isBlock; }
-        }
+        public bool IsBlock => isBlock;
 
         /// <summary>
         /// Gets if this tag should be formatted as a block (or as inline)
         /// </summary>
         /// <returns>if should be formatted as block or inline</returns>
-        public bool IsFormattedAsBlock
-        {
-            get { return isFormattedAsBlock; }
-        }
+        public bool IsFormattedAsBlock => isFormattedAsBlock;
 
         /// <summary>
         /// Gets if this tag can contain block tags.
         /// </summary>
         /// <returns>if tag can contain block tags</returns>
-        public bool CanContainBlock
-        {
-            get { return canContainBlock; }
-        }
+        public bool CanContainBlock => canContainBlock;
 
         /// <summary>
         /// Gets if this tag is an inline tag.
         /// </summary>
         /// <returns>if this tag is an inline tag.</returns>
-        public bool IsInline
-        {
-            get { return !isBlock; }
-        }
+        public bool IsInline => !isBlock;
 
         /// <summary>
         /// Gets if this tag is a data only tag.
         /// </summary>
         /// <returns>if this tag is a data only tag</returns>
-        public bool IsData
-        {
-            get { return !canContainInline && !IsEmpty; }
-        }
+        public bool IsData => !canContainInline && !IsEmpty;
 
         /// <summary>
         /// Get if this is an empty tag
         /// </summary>
         /// <returns>if this is an empty tag</returns>
-        public bool IsEmpty
-        {
-            get { return empty; }
-        }
+        public bool IsEmpty => empty;
 
         /// <summary>
         /// Get if this tag is self closing.
         /// </summary>
         /// <returns>if this tag should be output as self closing.</returns>
-        public bool IsSelfClosing
-        {
-            get { return empty || selfClosing; }
-        }
+        public bool IsSelfClosing => empty || selfClosing;
 
         /// <summary>
         /// Get if this is a pre-defined tag, or was auto created on parsing.
         /// </summary>
         /// <returns>if a known tag</returns>
-        public bool IsKnown
-        {
-            get { return tags.ContainsKey(tagName); }
-        }
+        public bool IsKnown => tags.ContainsKey(tagName);
 
         /// <summary>
         /// Check if this tagname is a known tag.
@@ -170,10 +167,7 @@ namespace Supremes.Nodes
         /// Get if this tag should preserve whitespace within child text nodes.
         /// </summary>
         /// <returns>if preserve whitepace</returns>
-        public bool PreservesWhitespace
-        {
-            get { return preservesWhitespace; }
-        }
+        public bool PreservesWhitespace => preservesWhitespace;
 
         /// <summary>
         /// Get if this tag represents a control associated with a form.
@@ -182,10 +176,7 @@ namespace Supremes.Nodes
         /// E.g. input, textarea, output
         /// </remarks>
         /// <returns>if associated with a form</returns>
-        public bool IsFormListed
-        {
-            get { return formList; }
-        }
+        public bool IsFormListed => formList;
 
         /// <summary>
         /// Get if this tag represents an element that should be submitted with a form.
@@ -194,10 +185,7 @@ namespace Supremes.Nodes
         /// E.g. input, option
         /// </remarks>
         /// <returns>if submittable with a form</returns>
-        public bool IsFormSubmittable
-        {
-            get { return formSubmit; }
-        }
+        public bool IsFormSubmittable => formSubmit;
 
         internal Tag SetSelfClosing()
         {
