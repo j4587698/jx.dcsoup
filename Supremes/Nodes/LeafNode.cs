@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace Supremes.Nodes;
 
-abstract class LeafNode : Node
+public abstract class LeafNode : Node
 {
-    Object value; // either a string value, or an attribute map (in the rare case multiple attributes are set)
+    internal Object value; // either a string value, or an attribute map (in the rare case multiple attributes are set)
 
         protected bool HasAttributes()
         {

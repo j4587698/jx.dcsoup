@@ -1,4 +1,5 @@
-﻿using Supremes.Nodes;
+﻿using System;
+using Supremes.Nodes;
 
 namespace Supremes.Select
 {
@@ -40,9 +41,31 @@ namespace Supremes.Select
         /// @param depth the depth of the node, relative to the root node. E.g., the root node has depth 0, and a child node of that will have depth 1.
         /// @return Filter decision
         /// </summary> 
-        FilterResult Tail(Node node, int depth)
+        FilterResult Tail(Node node, int depth);
+    }
+    
+    /// <summary>
+    /// 
+    /// </summary>
+    public class LambdaNodeFilter : NodeFilter
+    {
+        private readonly Func<Node, int, NodeFilter.FilterResult> head;
+        private readonly Func<Node, int, NodeFilter.FilterResult> tail;
+
+        public LambdaNodeFilter(Func<Node, int, NodeFilter.FilterResult> head, Func<Node, int, NodeFilter.FilterResult> tail = null)
         {
-            return FilterResult.Continue;
+            this.head = head;
+            this.tail = tail;
+        }
+
+        public NodeFilter.FilterResult Head(Node node, int depth)
+        {
+            return head(node, depth);
+        }
+
+        public NodeFilter.FilterResult Tail(Node node, int depth)
+        {
+            return tail?.Invoke(node, depth) ?? NodeFilter.FilterResult.Continue;
         }
     }
 }

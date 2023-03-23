@@ -42,7 +42,7 @@ namespace Supremes.Test.net45.Nodes
             Tag div = Tag.ValueOf("div");
 
             Assert.IsTrue(div.IsBlock);
-            Assert.IsTrue(div.IsFormattedAsBlock);
+            Assert.IsTrue(div.FormatAsBlock);
         }
 
         [Test]
@@ -51,7 +51,7 @@ namespace Supremes.Test.net45.Nodes
             Tag p = Tag.ValueOf("p");
 
             Assert.IsTrue(p.IsBlock);
-            Assert.IsFalse(p.IsFormattedAsBlock);
+            Assert.IsFalse(p.FormatAsBlock);
         }
 
         [Test]
@@ -71,7 +71,7 @@ namespace Supremes.Test.net45.Nodes
 
             Assert.AreEqual(foo, foo2);
             Assert.IsTrue(foo.IsInline);
-            Assert.IsTrue(foo.IsFormattedAsBlock);
+            Assert.IsTrue(foo.FormatAsBlock);
         }
 
         [Test]

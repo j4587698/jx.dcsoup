@@ -168,7 +168,7 @@ namespace Supremes.Nodes
         ///  Clear (remove) each of the attributes in this node.
         /// </summary>
         /// <returns>this, for chaining</returns>
-        public Node ClearAttributes()
+        public virtual Node ClearAttributes()
         {
             if (HasAttributes)
             {
@@ -943,11 +943,11 @@ namespace Supremes.Nodes
         /// no parent or sibling nodes.
         /// </summary>
         /// <returns>a single independent copy of this node</returns>
-        public Node ShallowClone() {
+        public virtual Node ShallowClone() {
             return DoClone(null);
         }
 
-        internal Node DoClone(Node parent)
+        internal virtual Node DoClone(Node parent)
         {
             Node clone = (Node)this.MemberwiseClone();
             clone.parentNode = parent;

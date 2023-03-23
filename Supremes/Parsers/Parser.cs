@@ -25,11 +25,28 @@ namespace Supremes.Parsers
         /// Create a new Parser, using the specified TreeBuilder
         /// </summary>
         /// <param name="treeBuilder">TreeBuilder to use to parse input into Documents.</param>
-        internal Parser(TreeBuilder treeBuilder)
+        public Parser(TreeBuilder treeBuilder)
         {
             // by default, error tracking is disabled.
             this.treeBuilder = treeBuilder;
             Settings = treeBuilder.DefaultSettings;
+            errors = ParseErrorList.NoTracking();
+        }
+        
+        /// <summary>
+        /// Creates a new Parser as a deep copy of this; including initializing a new TreeBuilder. Allows independent (multi-threaded) use.
+        /// </summary>
+        /// <returns>a copied parser</returns>
+        public Parser NewInstance()
+        {
+            return new Parser(this);
+        }
+        
+        private Parser(Parser copy) {
+            treeBuilder = copy.treeBuilder.NewInstance(); // because extended
+            errors = new ParseErrorList(copy.errors); // only copies size, not contents
+            Settings = new ParseSettings(copy.Settings);
+            trackPosition = copy.trackPosition;
         }
 
         /// <summary>

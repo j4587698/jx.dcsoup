@@ -8,11 +8,10 @@ namespace Supremes.Nodes
     /// A text node.
     /// </summary>
     /// <author>Jonathan Hedley, jonathan@hedley.net</author>
-    public sealed class TextNode : Node
+    public class TextNode : LeafNode
     {
         private const string TEXT_KEY = "text";
-
-        internal string text;
+        
 
         /// <summary>
         /// Create a new TextNode representing the supplied (unencoded) text).
@@ -22,13 +21,10 @@ namespace Supremes.Nodes
         /// </seealso>
         internal TextNode(string text)
         {
-            this.text = text;
+            this.value = text;
         }
 
-        internal override string NodeName
-        {
-        	get { return "#text"; }
-        }
+        internal override string NodeName => "#text";
 
         /// <summary>
         /// Get or Set text content of this text node.
@@ -44,17 +40,10 @@ namespace Supremes.Nodes
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
         public string Text
         {
-            get
-            {
-                return NormaliseWhitespace(WholeText);
-            }
+            get => StringUtil.NormaliseWhitespace(WholeText);
             set
             {
-                this.text = value;
-                if (attributes != null)
-                {
-                    attributes[TEXT_KEY] = value;
-                }
+                CoreValue(value);
             }
         }
 
@@ -62,20 +51,14 @@ namespace Supremes.Nodes
         /// Get the (unencoded) text of this text node, including any newlines and spaces present in the original.
         /// </summary>
         /// <returns>text</returns>
-        public string WholeText
-        {
-            get { return attributes == null ? text : attributes[TEXT_KEY]; }
-        }
+        public string WholeText => CoreValue();
 
         /// <summary>
         /// Test if this text node is blank -- that is, empty or only whitespace (including newlines).
         /// </summary>
         /// <returns>true if this document is empty or only whitespace, false if it contains any text content.
         /// </returns>
-        public bool IsBlank
-        {
-            get { return string.IsNullOrWhiteSpace(WholeText); }
-        }
+        public bool IsBlank => StringUtil.IsBlank(WholeText);
 
         /// <summary>
         /// Split this text node into two nodes at the specified string offset.
@@ -106,7 +89,7 @@ namespace Supremes.Nodes
             if (@out.PrettyPrint
                 && ((SiblingIndex == 0
                         && parentNode is Element
-                        && ((Element)parentNode).Tag.IsFormattedAsBlock
+                        && ((Element)parentNode).Tag.FormatAsBlock
                         && !IsBlank)
                     || (@out.Outline
                         && SiblingNodes.Count > 0

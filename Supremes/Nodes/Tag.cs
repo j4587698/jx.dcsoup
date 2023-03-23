@@ -19,17 +19,13 @@ namespace Supremes.Nodes
 
         private bool isBlock = true;
 
-        private bool isFormattedAsBlock = true;
-
-        private bool canContainBlock = true;
-
-        private bool canContainInline = true;
+        private bool formatAsBlock = true;
 
         private bool empty = false;
 
         private bool selfClosing = false;
 
-        private bool preservesWhitespace = false;
+        private bool preserveWhitespace = false;
 
         private bool formList = false;
 
@@ -115,25 +111,13 @@ namespace Supremes.Nodes
         /// Gets if this tag should be formatted as a block (or as inline)
         /// </summary>
         /// <returns>if should be formatted as block or inline</returns>
-        public bool IsFormattedAsBlock => isFormattedAsBlock;
-
-        /// <summary>
-        /// Gets if this tag can contain block tags.
-        /// </summary>
-        /// <returns>if tag can contain block tags</returns>
-        public bool CanContainBlock => canContainBlock;
+        public bool FormatAsBlock => formatAsBlock;
 
         /// <summary>
         /// Gets if this tag is an inline tag.
         /// </summary>
         /// <returns>if this tag is an inline tag.</returns>
         public bool IsInline => !isBlock;
-
-        /// <summary>
-        /// Gets if this tag is a data only tag.
-        /// </summary>
-        /// <returns>if this tag is a data only tag</returns>
-        public bool IsData => !canContainInline && !IsEmpty;
 
         /// <summary>
         /// Get if this is an empty tag
@@ -167,7 +151,7 @@ namespace Supremes.Nodes
         /// Get if this tag should preserve whitespace within child text nodes.
         /// </summary>
         /// <returns>if preserve whitepace</returns>
-        public bool PreservesWhitespace => preservesWhitespace;
+        public bool PreserveWhitespace => preserveWhitespace;
 
         /// <summary>
         /// Get if this tag represents a control associated with a form.
@@ -204,52 +188,19 @@ namespace Supremes.Nodes
             {
                 return true;
             }
-			Supremes.Nodes.Tag tag = obj as Supremes.Nodes.Tag;
-            if (tag == null)
+
+            if (obj is not Tag tag)
             {
                 return false;
             }
-            if (canContainBlock != tag.canContainBlock)
-            {
-                return false;
-            }
-            if (canContainInline != tag.canContainInline)
-            {
-                return false;
-            }
-            if (empty != tag.empty)
-            {
-                return false;
-            }
-            if (isFormattedAsBlock != tag.isFormattedAsBlock)
-            {
-                return false;
-            }
-            if (isBlock != tag.isBlock)
-            {
-                return false;
-            }
-            if (preservesWhitespace != tag.preservesWhitespace)
-            {
-                return false;
-            }
-            if (selfClosing != tag.selfClosing)
-            {
-                return false;
-            }
-            if (formList != tag.formList)
-            {
-                return false;
-            }
-            if (formSubmit != tag.formSubmit)
-            {
-                return false;
-            }
-            if (!tagName.Equals(tag.tagName))
-            {
-                return false;
-            }
-            return true;
+            if (!tagName.Equals(tag.tagName)) return false;
+            if (empty != tag.empty) return false;
+            if (formatAsBlock != tag.formatAsBlock) return false;
+            if (isBlock != tag.isBlock) return false;
+            if (preserveWhitespace != tag.preserveWhitespace) return false;
+            if (selfClosing != tag.selfClosing) return false;
+            if (formList != tag.formList) return false;
+            return formSubmit == tag.formSubmit;
         }
 
         /// <summary>
@@ -262,12 +213,10 @@ namespace Supremes.Nodes
             unchecked
             {
                 result = 31 * result + (isBlock ? 1 : 0);
-                result = 31 * result + (isFormattedAsBlock ? 1 : 0);
-                result = 31 * result + (canContainBlock ? 1 : 0);
-                result = 31 * result + (canContainInline ? 1 : 0);
+                result = 31 * result + (formatAsBlock ? 1 : 0);
                 result = 31 * result + (empty ? 1 : 0);
                 result = 31 * result + (selfClosing ? 1 : 0);
-                result = 31 * result + (preservesWhitespace ? 1 : 0);
+                result = 31 * result + (preserveWhitespace ? 1 : 0);
                 result = 31 * result + (formList ? 1 : 0);
                 result = 31 * result + (formSubmit ? 1 : 0);
             }
@@ -334,8 +283,7 @@ namespace Supremes.Nodes
             {
                 Supremes.Nodes.Tag tag = new Supremes.Nodes.Tag(tagName_1);
                 tag.isBlock = false;
-                tag.canContainBlock = false;
-                tag.isFormattedAsBlock = false;
+                tag.formatAsBlock = false;
                 Register(tag);
             }
             // mods:
@@ -343,21 +291,19 @@ namespace Supremes.Nodes
             {
                 Supremes.Nodes.Tag tag = tags[tagName_2];
                 Validate.NotNull(tag);
-                tag.canContainBlock = false;
-                tag.canContainInline = false;
                 tag.empty = true;
             }
             foreach (string tagName_3 in formatAsInlineTags)
             {
                 Supremes.Nodes.Tag tag = tags[tagName_3];
                 Validate.NotNull(tag);
-                tag.isFormattedAsBlock = false;
+                tag.formatAsBlock = false;
             }
             foreach (string tagName_4 in preserveWhitespaceTags)
             {
                 Supremes.Nodes.Tag tag = tags[tagName_4];
                 Validate.NotNull(tag);
-                tag.preservesWhitespace = true;
+                tag.preserveWhitespace = true;
             }
             foreach (string tagName_5 in formListedTags)
             {

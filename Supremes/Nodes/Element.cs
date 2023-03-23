@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using Supremes.Internal;
 
 namespace Supremes.Nodes
 {
@@ -1093,6 +1094,39 @@ namespace Supremes.Nodes
 
             return 0;
         }
+        
+        /// <summary>
+        /// Gets the first child of this Element that is an Element, or {@code null} if there is none.
+        /// </summary>
+        /// <returns>the first Element child node, or null.</returns>
+        public Element FirstElementChild()
+        {
+            var size = ChildNodeSize;
+            if (size == 0) return null;
+            var children = EnsureChildNodes();
+            for (int i = 0; i < size; i++)
+            {
+                var node = children[i];
+                if (node is Element element) return element;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the last child of this Element that is an Element, or @{code null} if there is none.
+        /// </summary>
+        /// <returns>the last Element child node, or null.</returns>
+        public Element LastElementChild() {
+            var size = ChildNodeSize;
+            if (size == 0) return null;
+            var children = EnsureChildNodes();
+            for (var i = size -1; i >= 0; i--) {
+                var node = children[i];
+                if (node is Element element) return element;
+            }
+            return null;
+        }
+
 
         // DOM type methods
         
@@ -1108,7 +1142,7 @@ namespace Supremes.Nodes
         public Elements GetElementsByTag(string tagName)
         {
             Validate.NotEmpty(tagName);
-            tagName = tagName.ToLower().Trim();
+            tagName = Normalizer.Normalize(tagName);
             return Collector.Collect(new Evaluator.Tag(tagName), this);
         }
 
@@ -1175,7 +1209,7 @@ namespace Supremes.Nodes
         public Elements GetElementsByAttribute(string key)
         {
             Validate.NotEmpty(key);
-            key = key.Trim().ToLower();
+            key = key.Trim();
             return Collector.Collect(new Evaluator.Attribute(key), this);
         }
 
@@ -1197,7 +1231,7 @@ namespace Supremes.Nodes
         public Elements GetElementsByAttributeStarting(string keyPrefix)
         {
             Validate.NotEmpty(keyPrefix);
-            keyPrefix = keyPrefix.Trim().ToLower();
+            keyPrefix = keyPrefix.Trim();
             return Collector.Collect(new Evaluator.AttributeStarting(keyPrefix), this);
         }
 
@@ -1294,8 +1328,7 @@ namespace Supremes.Nodes
         /// <returns>elements that have attributes matching this regular expression</returns>
         public Elements GetElementsByAttributeValueMatching(string key, string regex)
         {
-            Regex pattern;
-            pattern = new Regex(regex, RegexOptions.Compiled); // may throw an exception
+            var pattern = new Regex(regex, RegexOptions.Compiled); // may throw an exception
             return GetElementsByAttributeValueMatching(key, pattern);
         }
 
@@ -1379,8 +1412,7 @@ namespace Supremes.Nodes
         /// <seealso cref="Element.Text">Element.Text</seealso>
         public Elements GetElementsMatchingText(string regex)
         {
-            Regex pattern;
-            pattern = new Regex(regex, RegexOptions.Compiled); // may throw an exception
+            var pattern = new Regex(regex, RegexOptions.Compiled); // may throw an exception
             return GetElementsMatchingText(pattern);
         }
 
@@ -1440,16 +1472,65 @@ namespace Supremes.Nodes
         {
             get
             {
-                StringBuilder accum = new StringBuilder();
-                new NodeTraversor(new TextVisitor(accum)).Traverse(this);
-                return accum.ToString().Trim();
+                StringBuilder accum = StringUtil.BorrowBuilder();
+                NodeTraversor.Traverse(new TextVisitor(accum), this);
+                return StringUtil.ReleaseBuilder(accum).Trim();
             }
             set
             {
                 Validate.NotNull(value);
                 Empty();
-                TextNode textNode = new TextNode(value, baseUri);
-                AppendChild(textNode);
+                var owner = OwnerDocument;
+                if (owner != null && owner.Parser.IsContentForTagData(NormalName))
+                {
+                    AppendChild(new DataNode(value));
+                }
+                else
+                {
+                    AppendChild(new TextNode(value));
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Get the non-normalized, decoded text of this element and its children, including only any newlines and spaces
+        /// present in the original source.
+        /// </summary>
+        public string WholeText
+        {
+            get
+            {
+                var accum = StringUtil.BorrowBuilder();
+                NodeTraversor.Traverse(new LambdaNodeVisitor((node, depth) => AppendWholeText(node, accum)), this);
+                return StringUtil.ReleaseBuilder(accum);
+            }
+        }
+
+        private static void AppendWholeText(Node node, StringBuilder accum) {
+            if (node is TextNode textNode) {
+                accum.Append(textNode.WholeText);
+            } else if (node.IsNode("br")) {
+                accum.Append("\n");
+            }
+        }
+        
+        /// <summary>
+        /// Get the non-normalized, decoded text of this element, <b>not including</b> any child elements, including only any
+        /// newlines and spaces present in the original source.
+        /// </summary>
+        public string WholeOwnText
+        {
+            get
+            {
+                var accum = StringUtil.BorrowBuilder();
+                var size = ChildNodeSize;
+                for (var i = 0; i < size; i++)
+                {
+                    var node = ChildNodes()[i];
+                    AppendWholeText(node, accum);
+                }
+
+                return StringUtil.ReleaseBuilder(accum);
             }
         }
 
@@ -1462,16 +1543,14 @@ namespace Supremes.Nodes
 
             public void Head(Node node, int depth)
             {
-                if (node is TextNode)
+                if (node is TextNode textNode)
                 {
-                    TextNode textNode = (TextNode)node;
-                    Supremes.Nodes.Element.AppendNormalisedText(accum, textNode);
+                    AppendNormalisedText(accum, textNode);
                 }
                 else
                 {
-                    if (node is Element)
+                    if (node is Element element)
                     {
-                        Element element = (Element)node;
                         if (accum.Length > 0 && (element.IsBlock || element.TagName.Equals("br")) && 
                             !TextNode.LastCharIsWhitespace(accum))
                         {
@@ -1483,6 +1562,15 @@ namespace Supremes.Nodes
 
             public void Tail(Node node, int depth)
             {
+                if (node is Element element)
+                {
+                    Node next = node.NextSibling;
+                    if (element.IsBlock && (next is TextNode || (next is Element element1 && element1.tag.FormatAsBlock))
+                                        && !TextNode.LastCharIsWhitespace(accum))
+                    {
+                        accum.Append(" ");
+                    }
+                }
             }
 
             private readonly StringBuilder accum;
@@ -1528,17 +1616,13 @@ namespace Supremes.Nodes
         {
             foreach (Node child in childNodes)
             {
-                if (child is TextNode)
+                if (child is TextNode textNode)
                 {
-                    TextNode textNode = (TextNode)child;
                     AppendNormalisedText(accum, textNode);
                 }
-                else
+                else if (child.IsNode("br") && !TextNode.LastCharIsWhitespace(accum))
                 {
-                    if (child is Element)
-                    {
-                        AppendWhitespaceIfBr((Element)child, accum);
-                    }
+                    accum.Append(" ");
                 }
             }
         }
@@ -1546,7 +1630,7 @@ namespace Supremes.Nodes
         private static void AppendNormalisedText(StringBuilder accum, TextNode textNode)
         {
             string text = textNode.WholeText;
-            if (PreserveWhitespace(textNode.Parent))
+            if (PreserveWhitespace(textNode.ParentNode) || textNode is CDataNode)
             {
                 accum.Append(text);
             }
@@ -1556,21 +1640,17 @@ namespace Supremes.Nodes
             }
         }
 
-        private static void AppendWhitespaceIfBr(Element element, StringBuilder accum)
-        {
-            if (element.TagName.Equals("br") && !TextNode.LastCharIsWhitespace(accum))
-            {
-                accum.Append(" ");
-            }
-        }
-
         internal static bool PreserveWhitespace(Node node)
         {
-            // looks only at this element and one level up, to prevent recursion & needless stack searches
-            if (node != null && node is Element)
-            {
-                Element element = (Element)node;
-                return element.Tag.PreservesWhitespace || element.Parent != null && element.Parent.Tag.PreservesWhitespace;
+            // looks only at this element and five levels up, to prevent recursion & needless stack searches
+            if (node is Element el) {
+                int i = 0;
+                do {
+                    if (el.tag.PreserveWhitespace)
+                        return true;
+                    el = el.Parent;
+                    i++;
+                } while (i < 6 && el != null);
             }
             return false;
         }
@@ -1583,29 +1663,17 @@ namespace Supremes.Nodes
         {
             get
             {
-                foreach (Node child in childNodes)
-                {
-                    if (child is TextNode)
-                    {
-                        TextNode textNode = (TextNode)child;
-                        if (!textNode.IsBlank)
-                        {
-                            return true;
+                bool hasText = false;
+                Filter(new LambdaNodeFilter((node, depth) => {
+                    if (node is TextNode textNode) {
+                        if (!textNode.IsBlank) {
+                            hasText = true;
+                            return NodeFilter.FilterResult.Stop;
                         }
                     }
-                    else
-                    {
-                        if (child is Element)
-                        {
-                            Element el = (Element)child;
-                            if (el.HasText)
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                }
-                return false;
+                    return NodeFilter.FilterResult.Continue;
+                }));
+                return hasText;
             }
         }
 
@@ -1623,25 +1691,19 @@ namespace Supremes.Nodes
         {
             get
             {
-                StringBuilder sb = new StringBuilder();
-                foreach (Node childNode in childNodes)
-                {
-                    if (childNode is DataNode)
-                    {
-                        DataNode data = (DataNode)childNode;
+                StringBuilder sb = StringUtil.BorrowBuilder();
+                Traverse(new LambdaNodeVisitor((childNode, depth) => {
+                    if (childNode is DataNode data) {
                         sb.Append(data.WholeData);
+                    } else if (childNode is Comment comment) {
+                        sb.Append(comment.Data);
+                    } else if (childNode is CDataNode cDataNode) {
+                        // this shouldn't really happen because the html parser won't see the cdata as anything special when parsing script.
+                        // but in case another type gets through.
+                        sb.Append(cDataNode.WholeText);
                     }
-                    else
-                    {
-                        if (childNode is Element)
-                        {
-                            Element element = (Element)childNode;
-                            string elementData = element.Data;
-                            sb.Append(elementData);
-                        }
-                    }
-                }
-                return sb.ToString();
+                }));
+                return StringUtil.ReleaseBuilder(sb);
             }
         }
 
@@ -1657,10 +1719,7 @@ namespace Supremes.Nodes
         /// The literal class attribute, or <b>empty string</b>
         /// if no class attribute set.
         /// </returns>
-        public string ClassName
-        {
-            get { return Attr("class"); }
-        }
+        public string ClassName => Attr("class").Trim();
 
         /// <summary>
         /// Get or Set all of the element's class names.
@@ -1688,17 +1747,23 @@ namespace Supremes.Nodes
         {
             get
             {
-                if (classNames == null)
-                {
-                    string[] names = Regex.Split(ClassName, "\\s+");
-                    classNames = new LinkedHashSet<string>(names);
-                }
+                string[] names = ClassSplit.Split(ClassName);
+                var classNames = new LinkedHashSet<string>(names);
+                classNames.Remove("");
                 return classNames;
             }
             set
             {
                 Validate.NotNull(value);
-                attributes["class"] = string.Join(" ", value);
+                if (ClassNames.Count == 0)
+                {
+                    attributes.Remove("class");
+                }
+                else
+                {
+                    attributes["class"] = string.Join(" ", value);
+                }
+                
             }
         }
 
@@ -1712,14 +1777,48 @@ namespace Supremes.Nodes
         /// <returns>true if it does, false if not</returns>
         public bool HasClass(string className)
         {
-            ICollection<string> classNames = ClassNames;
-            foreach (string name in classNames)
-            {
-                if (string.Equals(className, name, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
+            if (attributes == null)
+                return false;
+
+            string classAttr = attributes.GetIgnoreCase("class");
+            int len = classAttr.Length;
+            int wantLen = className.Length;
+
+            if (len == 0 || len < wantLen) {
+                return false;
+            }
+
+            // if both lengths are equal, only need compare the className with the attribute
+            if (len == wantLen) {
+                return className.Equals(classAttr, StringComparison.InvariantCultureIgnoreCase);
+            }
+
+            // otherwise, scan for whitespace and compare regions (with no string or arraylist allocations)
+            bool inClass = false;
+            int start = 0;
+            for (int i = 0; i < len; i++) {
+                if (char.IsWhiteSpace(classAttr[i])) {
+                    if (inClass) {
+                        // white space ends a class name, compare it with the requested one, ignore case
+                        if (i - start == wantLen && classAttr.Substring(start, wantLen).Equals(className, StringComparison.InvariantCultureIgnoreCase)) {
+                            return true;
+                        }
+                        inClass = false;
+                    }
+                } else {
+                    if (!inClass) {
+                        // we're in a class name : keep the start of the substring
+                        inClass = true;
+                        start = i;
+                    }
                 }
             }
+
+            // check the last entry
+            if (inClass && len - start == wantLen) {
+                return classAttr.Substring(start, wantLen).Equals(className, StringComparison.InvariantCultureIgnoreCase);
+            }
+
             return false;
         }
 
@@ -1793,7 +1892,7 @@ namespace Supremes.Nodes
         {
             get
             {
-                if (TagName.Equals("textarea"))
+                if (NormalName.Equals("textarea"))
                 {
                     return Text;
                 }
@@ -1804,7 +1903,7 @@ namespace Supremes.Nodes
             }
             set
             {
-                if (TagName.Equals("textarea"))
+                if (NormalName.Equals("textarea"))
                 {
                     Text = value;
                 }
@@ -1815,35 +1914,38 @@ namespace Supremes.Nodes
             }
         }
 
+        internal bool ShouldIndent(DocumentOutputSettings @out) {
+            return @out.PrettyPrint && IsFormatAsBlock(@out) && !IsInlineable(@out) && !PreserveWhitespace(parentNode);
+        }
+
         internal override void AppendOuterHtmlHeadTo(StringBuilder accum, int depth, DocumentOutputSettings @out)
         {
-            if (accum.Length > 0
-                && @out.PrettyPrint
-                && (tag.IsFormattedAsBlock
-                    || (Parent != null && Parent.Tag.IsFormattedAsBlock)
-                    || @out.Outline))
+            if (ShouldIndent(@out))
             {
-                Indent(accum, depth, @out);
+                if (accum is StringBuilder)
+                {
+                    if (((StringBuilder)accum).Length > 0)
+                        Indent(accum, depth, @out);
+                }
+                else
+                {
+                    Indent(accum, depth, @out);
+                }
             }
-            accum.Append("<").Append(TagName);
-            attributes.AppendHtmlTo(accum, @out);
+
+            accum.Append('<').Append(TagName);
+            attributes?.AppendHtmlTo(accum, @out);
+
             // selfclosing includes unknown tags, isEmpty defines tags that are always empty
             if (childNodes.Count == 0 && tag.IsSelfClosing)
             {
                 if (@out.Syntax == DocumentSyntax.Html && tag.IsEmpty)
-                {
                     accum.Append('>');
-                }
                 else
-                {
-                    accum.Append(" />");
-                }
+                    accum.Append(" />"); // <img> in html, <img /> in xml
             }
             else
-            {
-                // <img> in html, <img /> in xml
-                accum.Append(">");
-            }
+                accum.Append('>');
         }
 
         internal override void AppendOuterHtmlTailTo(StringBuilder accum, int depth, DocumentOutputSettings @out)
@@ -1852,11 +1954,10 @@ namespace Supremes.Nodes
             {
                 if (@out.PrettyPrint
                     && (childNodes.Count > 0
-                        && (tag.IsFormattedAsBlock
-                            || (@out.Outline
-                                && (childNodes.Count > 1
-                                    || (childNodes.Count == 1
-                                        && !(childNodes[0] is TextNode)))))))
+                        && (tag.FormatAsBlock
+                            || !PreserveWhitespace(ParentNode))
+                        || (@out.Outline && (childNodes.Count > 1 || 
+                                             (childNodes.Count == 1 && childNodes[0] is Element)))))
                 {
                     Indent(accum, depth, @out);
                 }
@@ -1892,11 +1993,12 @@ namespace Supremes.Nodes
         {
             get
             {
-                StringBuilder accum = new StringBuilder();
+                StringBuilder accum = StringUtil.BorrowBuilder();
                 AppendHtmlTo(accum);
-                return GetOutputSettings().PrettyPrint
-                    ? accum.ToString().Trim()
-                    : accum.ToString();
+                var html = StringUtil.ReleaseBuilder(accum);
+                return NodeUtils.OutputSettings(this).PrettyPrint
+                    ? html.Trim()
+                    : html;
             }
             set
             {
@@ -1911,6 +2013,66 @@ namespace Supremes.Nodes
             {
                 ((Node)node).AppendOuterHtmlTo(accum);
             }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public override Node ShallowClone()
+        {
+            return new Element(tag, BaseUri, attributes?.Clone());
+        }
+
+        internal override Node DoClone(Node parent)
+        {
+            var clone = base.DoClone(parent) as Element;
+            clone.attributes = attributes?.Clone();
+            clone.childNodes = new NodeList(clone, childNodes.Count);
+            clone.childNodes.AddRange(childNodes);
+            return clone;
+        }
+
+        public override Node ClearAttributes()
+        {
+            if (attributes != null)
+            {
+                base.ClearAttributes();
+                attributes = null;
+            }
+
+            return this;
+        }
+
+        /// <summary>
+        /// Perform the supplied action on this Element and each of its descendant Elements, during a depth-first traversal.
+        /// Elements may be inspected, changed, added, replaced, or removed.
+        /// </summary>
+        /// <param name="action">the function to perform on the element</param>
+        /// <returns> this Element, for chaining</returns>
+        public Element ForEach(Action<Element> action)
+        {
+            Validate.NotNull(action);
+            NodeTraversor.Traverse(new LambdaNodeVisitor((node, depth) => {
+                if (node is Element element)
+                    action(element);
+            }), this);
+            return this;
+        }
+        
+        private bool IsFormatAsBlock(DocumentOutputSettings @out)
+        {
+            return tag.FormatAsBlock || (Parent != null && Parent.Tag.FormatAsBlock) || @out.Outline;
+        }
+
+        private bool IsInlineable(DocumentOutputSettings @out)
+        {
+            if (!tag.IsInline)
+                return false;
+            return (Parent == null || Parent.IsBlock)
+                   && !IsEffectivelyFirst()
+                   && !@out.Outline
+                && !IsNode("br");
         }
 
         /// <summary>
@@ -1947,19 +2109,7 @@ namespace Supremes.Nodes
             return result;
         }
 
-        internal override Node Clone()
-        {
-            return PrivateClone();
-        }
 
-        private Element PrivateClone()
-        {
-            Supremes.Nodes.Element clone = (Supremes.Nodes.Element)base.Clone();
-            clone.classNames = null;
-            // derived on first hit, otherwise gets a pointer to source classnames
-            return clone;
-        }
-        
         private class NodeList: List<Node>
         {
             private readonly Element owner;

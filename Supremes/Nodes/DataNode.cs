@@ -7,7 +7,7 @@ namespace Supremes.Nodes
     /// A data node, for contents of style, script tags etc, where contents should not show in text().
     /// </summary>
     /// <author>Jonathan Hedley, jonathan@hedley.net</author>
-    public sealed class DataNode : Node
+    public sealed class DataNode : LeafNode
     {
         private const string DATA_KEY = "data";
 

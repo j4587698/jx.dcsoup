@@ -5,7 +5,7 @@ using Supremes.Nodes;
 namespace Supremes.Parsers
 {
     /// <author>Jonathan Hedley</author>
-    internal abstract class TreeBuilder
+    public abstract class TreeBuilder
     {
         internal Parser parser;
         
@@ -21,8 +21,6 @@ namespace Supremes.Parsers
 
         internal Token currentToken;
 
-        internal ParseErrorList errors;
-        
         internal ParseSettings settings;
 
         internal Dictionary<string, Token.Tag> seenTags;
@@ -40,7 +38,7 @@ namespace Supremes.Parsers
         // current base uri, for creating new elements
         // currentToken is used only for error tracking.
         // null when not tracking errors
-        internal virtual void InitialiseParse(string input, string baseUri, Parser parser)
+        internal virtual void InitialiseParse(StringReader input, string baseUri, Parser parser)
         {
             Validate.NotNull(input, "String input must not be null");
             Validate.NotNull(baseUri, "BaseURI must not be null");
@@ -59,17 +57,19 @@ namespace Supremes.Parsers
             this.baseUri = baseUri;
         }
 
-        internal Document Parse(string input, string baseUri)
+        internal Document Parse(StringReader input, string baseUri, Parser parser)
         {
-            return Parse(input, baseUri, ParseErrorList.NoTracking());
-        }
-
-        internal virtual Document Parse(string input, string baseUri, ParseErrorList errors)
-        {
-            InitialiseParse(input, baseUri, errors);
+            InitialiseParse(input, baseUri, parser);
             RunParser();
+            reader.Close();
+            reader = null;
+            tokeniser = null;
+            stack = null;
+            seenTags = null;
             return doc;
         }
+        
+        internal abstract TreeBuilder NewInstance { get; }
 
         internal abstract IReadOnlyList<Node> ParseFragment(string inputFragment, Element context, string baseUri, Parser parser);
         
@@ -79,6 +79,7 @@ namespace Supremes.Parsers
             {
                 Token token = tokeniser.Read();
                 Process(token);
+                token.Reset();
                 if (token.type == TokenType.EOF)
                 {
                     break;
