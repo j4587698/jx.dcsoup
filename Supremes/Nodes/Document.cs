@@ -51,6 +51,8 @@ namespace Supremes.Nodes
 
         private int indentAmount = 1;
         
+        private int maxPaddingWidth = 30;
+        
         private readonly ThreadLocal<CharsetEncoder> encoderThreadLocal = new ThreadLocal<CharsetEncoder>(); // initialized by start of OuterHtmlVisitor
 
         internal DocumentOutputSettings()
@@ -170,6 +172,20 @@ namespace Supremes.Nodes
                 indentAmount = value;
             }
         }
+
+        /// <summary>
+        /// Get / Set the current max padding amount, used when pretty printing
+        /// so very deeply nested nodes don't get insane padding amounts.
+        /// </summary>
+        public int MaxPaddingWidth
+        {
+            get => maxPaddingWidth;
+            set
+            {
+                Validate.IsTrue(value >= -1);
+                maxPaddingWidth = value;
+            }
+        }
         
         internal Entities.CoreCharset CoreCharset { get; set; }
 
@@ -183,7 +199,7 @@ namespace Supremes.Nodes
             return encoder;
         }
 
-        internal DocumentOutputSettings Clone()
+        public DocumentOutputSettings Clone()
         {
             DocumentOutputSettings clone;
             clone = (DocumentOutputSettings)this.MemberwiseClone();

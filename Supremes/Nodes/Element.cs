@@ -46,7 +46,7 @@ namespace Supremes.Nodes
         /// <param name="attributes">initial attributes</param>
         /// <seealso cref="AppendChild(Node)">AppendChild(Node)</seealso>
         /// <seealso cref="AppendElement(string)">AppendElement(string)</seealso>
-        internal Element(Tag tag, string baseUri, Attributes attributes)
+        internal Element(Tag tag, string baseUri, Attributes attributes = null)
         {
             Validate.NotNull(tag);
             childNodes = EmptyNodes;
@@ -58,20 +58,6 @@ namespace Supremes.Nodes
             }
         }
 
-        /// <summary>
-        /// Create a new Element from a tag and a base URI.
-        /// </summary>
-        /// <param name="tag">element tag</param>
-        /// <param name="baseUri">
-        /// the base URI of this element. It is acceptable for the base URI to be an empty
-        /// string, but not null.
-        /// </param>
-        /// <seealso cref="Supremes.Nodes.Tag.ValueOf(string)">Tag.ValueOf(string)</seealso>
-        internal Element(Tag tag, string baseUri)
-            : this(tag, baseUri, null)
-        {
-        }
-        
         /// <summary>
         /// Internal test to check if a nodelist object has been created.
         /// </summary>
@@ -91,8 +77,14 @@ namespace Supremes.Nodes
             return childNodes;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         protected override bool HasAttributes => attributes != null;
 
+        /// <summary>
+        /// 
+        /// </summary>
         public override Attributes Attributes
         {
             get
@@ -102,6 +94,9 @@ namespace Supremes.Nodes
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public override string BaseUri => SearchUpForAttribute(this, BaseUriKey);
         
         private static string SearchUpForAttribute(Element start, string key) {
@@ -114,9 +109,31 @@ namespace Supremes.Nodes
             return "";
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="baseUri"></param>
+        protected override void DoSetBaseUri(string baseUri)
+        {
+            attributes.Put(BaseUriKey, baseUri);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
         public override int ChildNodeSize => childNodes.Count;
 
-        internal override string NodeName => tag.Name;
+        /// <summary>
+        /// 
+        /// </summary>
+        public override string NodeName => tag.Name;
+
+        /// <summary>
+        /// Get the normalized name of this Element's tag. This will always be the lower-cased version of the tag, regardless
+        /// of the tag case preserving setting of the parser. For e.g., {@code <DIV>} and {@code <div>} both have a
+        /// normal name of {@code div}.
+        /// </summary>
+        public new string NormalName => tag.NormalName;
 
         /// <summary>
         /// Get or Set the name of the tag for this element.
@@ -142,7 +159,7 @@ namespace Supremes.Nodes
             set
             {
                 Validate.NotEmpty(value, "Tag name must not be empty.");
-                tag = Tag.ValueOf(value, NodeUtils.Parser(this).set);
+                tag = Tag.ValueOf(value, NodeUtils.Parser(this).Settings);
             }
         }
 
@@ -150,10 +167,7 @@ namespace Supremes.Nodes
         /// Get the Tag for this element.
         /// </summary>
         /// <returns>the tag object</returns>
-        public Tag Tag
-        {
-            get { return tag; }
-        }
+        public Tag Tag => tag;
 
         /// <summary>
         /// Test if this element is a block-level element.
@@ -166,10 +180,7 @@ namespace Supremes.Nodes
         /// ).
         /// </remarks>
         /// <returns>true if block, false if not (and thus inline)</returns>
-        public bool IsBlock
-        {
-            get { return tag.IsBlock; }
-        }
+        public bool IsBlock => tag.IsBlock;
 
         /// <summary>
         /// Get the <c>id</c> attribute of this element.
@@ -177,8 +188,13 @@ namespace Supremes.Nodes
         /// <returns>The id attribute, if present, or an empty string if not.</returns>
         public string Id
         {
-            get { return Attr("id") ?? string.Empty; }
-        }
+            get => attributes != null ? attributes.GetIgnoreCase("id") : "";
+            set
+            {
+                Validate.NotNull(value);
+                Attr("id", value);
+            }
+        } 
 
         /// <summary>
         /// Set an attribute value on this element.
@@ -188,9 +204,23 @@ namespace Supremes.Nodes
         /// key, its value is updated; otherwise, a new attribute is added.
         /// </remarks>
         /// <returns>this element</returns>
-        internal new Element Attr(string attributeKey, string attributeValue)
+        public new Element Attr(string attributeKey, string attributeValue)
         {
             base.Attr(attributeKey, attributeValue);
+            return this;
+        }
+        
+        /// <summary>
+        /// Set a boolean attribute value on this element. Setting to <code>true</code> sets the attribute value to "" and
+        /// marks the attribute as boolean so no value is written out. Setting to <code>false</code> removes the attribute
+        /// with the same key if it exists.
+        /// </summary>
+        /// <param name="attributeKey">the attribute key</param>
+        /// <param name="attributeValue">the attribute value</param>
+        /// <returns></returns>
+        public Element Attr(string attributeKey, bool attributeValue)
+        {
+            attributes.Put(attributeKey, attributeValue);
             return this;
         }
 
@@ -219,20 +249,14 @@ namespace Supremes.Nodes
         /// <c>key=value</c>
         /// custom data attributes.
         /// </returns>
-        public IDictionary<string, string> Dataset
-        {
-            get { return attributes.Dataset; }
-        }
+        public IDictionary<string, string> Dataset => attributes.Dataset;
 
         /// <summary>
         /// Gets this element's parent element.
         /// </summary>
         /// <returns></returns>
-        public new Element Parent
-        {
-            get { return (Element)parentNode; }
-        }
-        
+        public new Element Parent => (Element)parentNode;
+
         /// <summary>
         /// Get this element's parent and ancestors, up to the document root.
         /// </summary>
@@ -242,18 +266,13 @@ namespace Supremes.Nodes
             get
             {
                 Elements parents = new Elements();
-                AccumulateParents(this, parents);
+                var parent = Parent;
+                while (parent != null && !parent.IsNode("#root"))
+                {
+                    parents.Add(parent);
+                    parent = parent.Parent;
+                }
                 return parents;
-            }
-        }
-
-        private static void AccumulateParents(Element el, Elements parents)
-        {
-        	Element parent = el.Parent;
-            if (parent != null && !parent.TagName.Equals("#root"))
-            {
-                parents.Add(parent);
-                AccumulateParents(parent, parents);
             }
         }
 
@@ -272,8 +291,13 @@ namespace Supremes.Nodes
         /// <seealso cref="Node.ChildNode(int)">Node.ChildNode(int)</seealso>
         public Element Child(int index)
         {
-            return Children[index];
+            return ChildElementsList()[index];
         }
+        
+        /// <summary>
+        ///  Get the number of child nodes of this element that are elements.
+        /// </summary>
+        public int ChildrenSize => ChildElementsList().Count;
 
         /// <summary>
         /// Get this element's child elements.
@@ -288,14 +312,27 @@ namespace Supremes.Nodes
         /// empty list.
         /// </returns>
         /// <seealso cref="Node.ChildNodes">Node.ChildNodes</seealso>
-        public Elements Children
-        {
-            get
-            {
-                // create on the fly rather than maintaining two lists. if gets slow, memoize, and mark dirty on change
-                IList<Element> elements = childNodes.OfType<Element>().ToList();
-                return new Elements(elements);
+        public Elements Children => new(ChildElementsList());
+
+        /// <summary>
+        /// Maintains a shadow copy of this element's child elements. If the nodelist is changed, this cache is invalidated.
+        /// </summary>
+        /// <returns></returns>
+        internal List<Element> ChildElementsList() {
+            if (ChildNodeSize == 0)
+                return EmptyChildren; // short circuit creating empty
+
+            if (shadowChildrenRef == null || shadowChildrenRef.TryGetTarget(out var children)) {
+                children = childNodes.OfType<Element>().ToList();
+                shadowChildrenRef = new WeakReference<List<Element>>(children);
             }
+            return children;
+        }
+
+        internal override void NodelistChanged()
+        {
+            base.NodelistChanged();
+            shadowChildrenRef = null;
         }
 
         /// <summary>
@@ -424,6 +461,141 @@ namespace Supremes.Nodes
         }
 
         /// <summary>
+        /// Find elements that match the supplied Evaluator. This has the same functionality as {@link #select(String)}, but
+        /// may be useful if you are running the same query many times (on many documents) and want to save the overhead of
+        /// repeatedly parsing the CSS query.
+        /// </summary>
+        /// <param name="evaluator">an element evaluator</param>
+        /// <returns>an {@link Elements} list containing elements that match the query (empty if none match)</returns>
+        public Elements Select(Evaluator evaluator)
+        {
+            return Selector.Select(evaluator, this);
+        }
+        
+        /// <summary>
+        /// Find the first Element that matches the {@link Selector} CSS query, with this element as the starting context.
+        /// <p>This is effectively the same as calling {@code element.select(query).first()}, but is more efficient as query
+        /// execution stops on the first hit.</p>
+        /// <p>Also known as {@code querySelector()} in the Web DOM.</p>
+        /// </summary>
+        /// <param name="cssQuery">cssQuery a {@link Selector} CSS-like query</param>
+        /// <returns>the first matching element, or <b>{@code null}</b> if there is no match.</returns>
+        public Element SelectFirst(string cssQuery)
+        {
+            return Selector.SelectFirst(cssQuery, this);
+        }
+        
+        /// <summary>
+        /// Finds the first Element that matches the supplied Evaluator, with this element as the starting context, or
+        /// {@code null} if none match.
+        /// </summary>
+        /// <param name="evaluator">an element evaluator</param>
+        /// <returns>the first matching element (walking down the tree, starting from this element), or {@code null} if none match.</returns>
+        public Element SelectFirst(Evaluator evaluator)
+        {
+            return Collector.FindFirst(evaluator, this);
+        }
+        
+        /// <summary>
+        /// Just like {@link #selectFirst(String)}, but if there is no match, throws an {@link IllegalArgumentException}. This
+        /// is useful if you want to simply abort processing on a failed match.
+        /// </summary>
+        /// <param name="cssQuery">a {@link Selector} CSS-like query</param>
+        /// <returns>the first matching element</returns>
+        public Element ExpectFirst(string cssQuery) {
+            return (Element) Validate.EnsureNotNull(
+                Selector.SelectFirst(cssQuery, this),
+                Parent != null ?
+                    "No elements matched the query '{0}' on element '{1}'.":
+                    "No elements matched the query '{0}' in the document."
+                , cssQuery, this.TagName
+            );
+        }
+        
+        /// <summary>
+        /// Checks if this element matches the given {@link Selector} CSS query. Also knows as {@code matches()} in the Web DOM.
+        /// </summary>
+        /// <param name="cssQuery">a {@link Selector} CSS query</param>
+        /// <returns>if this element matches the query</returns>
+        public bool Is(string cssQuery)
+        {
+            return Is(QueryParser.Parse(cssQuery));
+        }
+
+        /// <summary>
+        /// Check if this element matches the given evaluator.
+        /// </summary>
+        /// <param name="evaluator">evaluator an element evaluator</param>
+        /// <returns>if this element matches</returns>
+        public bool Is(Evaluator evaluator)
+        {
+            return evaluator.Matches(Root as Element, this);
+        }
+        
+        /// <summary>
+        /// Find the closest element up the tree of parents that matches the specified CSS query. Will return itself, an
+        /// ancestor, or {@code null} if there is no such matching element.
+        /// </summary>
+        /// <param name="cssQuery">a {@link Selector} CSS query</param>
+        /// <returns>the closest ancestor element (possibly itself) that matches the provided evaluator. {@code null} if not found.</returns>
+        public Element Closest(string cssQuery) {
+            return Closest(QueryParser.Parse(cssQuery));
+        }
+        
+        /// <summary>
+        /// Find the closest element up the tree of parents that matches the specified evaluator. Will return itself, an
+        /// ancestor, or {@code null} if there is no such matching element.
+        /// </summary>
+        /// <param name="evaluator">a query evaluator</param>
+        /// <returns>the closest ancestor element (possibly itself) that matches the provided evaluator. {@code null} if not found.</returns>
+        public Element Closest(Evaluator evaluator) {
+            Validate.NotNull(evaluator);
+            Element el = this;
+            Element root = Root as Element;
+            do {
+                if (evaluator.Matches(root, el))
+                    return el;
+                el = el.Parent;
+            } while (el != null);
+            return null;
+        }
+        
+        /// <summary>
+        /// Find Elements that match the supplied XPath expression.
+        /// <p>Note that for convenience of writing the Xpath expression, namespaces are disabled, and queries can be
+        /// expressed using the element's local name only.</p>
+        /// <p>By default, XPath 1.0 expressions are supported. If you would to use XPath 2.0 or higher, you can provide an
+        /// alternate XPathFactory implementation:</p>
+        /// <ol>
+        /// <li>Add the implementation to your classpath. E.g. to use <a href="https://www.saxonica.com/products/products.xml">Saxon-HE</a>, add <a href="https://mvnrepository.com/artifact/net.sf.saxon/Saxon-HE">net.sf.saxon:Saxon-HE</a> to your build.</li>
+        /// <li>Set the system property <code>javax.xml.xpath.XPathFactory:jsoup</code> to the implementing classname. E.g.:<br>
+        /// <code>System.setProperty(W3CDom.XPathFactoryProperty, "net.sf.saxon.xpath.XPathFactoryImpl");</code>
+        /// </li>
+        /// </ol>
+        /// </summary>
+        /// <param name="xpath">XPath expression</param>
+        /// <returns>matching elements, or an empty list if none match.</returns>
+        public Elements SelectXpath(string xpath) {
+            return new Elements(NodeUtils.SelectXpath<Element>(xpath, this, typeof(Element)));
+        }
+        
+        /// <summary>
+        /// Find Nodes that match the supplied XPath expression.
+        /// <p>For example, to select TextNodes under {@code p} elements: </p>
+        /// <pre>List&lt;TextNode&gt; textNodes = doc.selectXpath("//body//p//text()", TextNode.class);</pre>
+        /// <p>Note that in the jsoup DOM, Attribute objects are not Nodes. To directly select attribute values, do something
+        /// like:</p>
+        /// <pre>List&lt;String&gt; hrefs = doc.selectXpath("//a").eachAttr("href");</pre>
+        /// </summary>
+        /// <param name="xpath">XPath expression</param>
+        /// <typeparam name="T">the jsoup node type to return</typeparam>
+        /// <returns>a list of matching nodes</returns>
+        public List<T> SelectXpath<T>(string xpath) where T : Node {
+            return NodeUtils.SelectXpath<T>(xpath, this, typeof(T));
+        }
+
+        
+        /// <summary>
         /// Add a node child node to this element.
         /// </summary>
         /// <param name="child">node to add.</param>
@@ -431,7 +603,32 @@ namespace Supremes.Nodes
         public Element AppendChild(Node child)
         {
             Validate.NotNull(child);
-            AddChildren(child);
+            
+            ReparentChild(child);
+            EnsureChildNodes();
+            childNodes.Add(child);
+            child.siblingIndex = childNodes.Count - 1;
+            return this;
+        }
+        
+        /// <summary>
+        /// Insert the given nodes to the end of this Element's children.
+        /// </summary>
+        /// <param name="children">nodes to add</param>
+        /// <returns>this Element, for chaining</returns>
+        public Element AppendChildren(IEnumerable<Node> children) {
+            InsertChildren(-1, children);
+            return this;
+        }
+
+        /// <summary>
+        /// Add this element to the supplied parent element, as its next child.
+        /// </summary>
+        /// <param name="parent">element to which this element will be appended</param>
+        /// <returns>this element, so that you can continue modifying the element</returns>
+        public Element AppendTo(Element parent) {
+            Validate.NotNull(parent);
+            parent.AppendChild(this);
             return this;
         }
 
@@ -444,6 +641,18 @@ namespace Supremes.Nodes
         {
             Validate.NotNull(child);
             AddChildren(0, child);
+            return this;
+        }
+        
+        /// <summary>
+        /// Add a node to the start of this element's children.
+        /// </summary>
+        /// <param name="child">nodes to add</param>
+        /// <returns>this Element, for chaining</returns>
+        public Element PrependChild(IEnumerable<Node> child)
+        {
+            Validate.NotNull(child);
+            InsertChildren(0, child);
             return this;
         }
 
@@ -477,6 +686,28 @@ namespace Supremes.Nodes
             AddChildren(index, children.ToArray());
             return this;
         }
+        
+        /// <summary>
+        /// Inserts the given child nodes into this element at the specified index.
+        /// </summary>
+        /// <remarks>
+        /// Current nodes will be shifted to the
+        /// right. The inserted nodes will be moved from their current parent. To prevent moving, copy the nodes first.
+        /// </remarks>
+        /// <param name="index">
+        /// 0-based index to insert children at. Specify
+        /// <c>0</c>
+        /// to insert at the start,
+        /// <c>-1</c>
+        /// at the
+        /// end
+        /// </param>
+        /// <param name="children">child nodes to insert</param>
+        /// <returns>this element, for chaining.</returns>
+        public Element InsertChildren(int index, params Node[] children)
+        {
+            return InsertChildren(index, children);
+        }
 
         /// <summary>
         /// Create a new element by tag name, and add it as the last child.
@@ -492,8 +723,7 @@ namespace Supremes.Nodes
         /// </returns>
         public Element AppendElement(string tagName)
         {
-        	Tag tag = Nodes.Tag.ValueOf(tagName);
-            Element child = new Element(tag, BaseUri);
+            Element child = new Element(Tag.ValueOf(tagName, NodeUtils.Parser(this).Settings), BaseUri);
             AppendChild(child);
             return child;
         }
@@ -512,8 +742,7 @@ namespace Supremes.Nodes
         /// </returns>
         public Element PrependElement(string tagName)
         {
-        	Tag tag = Nodes.Tag.ValueOf(tagName);
-            Element child = new Element(tag, BaseUri);
+            Element child = new Element(Tag.ValueOf(tagName, NodeUtils.Parser(this).Settings), BaseUri);
             PrependChild(child);
             return child;
         }
@@ -525,7 +754,8 @@ namespace Supremes.Nodes
         /// <returns>this element</returns>
         public Element AppendText(string text)
         {
-            TextNode node = new TextNode(text, BaseUri);
+            Validate.NotNull(text);
+            TextNode node = new TextNode(text);
             AppendChild(node);
             return this;
         }
@@ -537,7 +767,8 @@ namespace Supremes.Nodes
         /// <returns>this element</returns>
         public Element PrependText(string text)
         {
-            TextNode node = new TextNode(text, BaseUri);
+            Validate.NotNull(text);
+            TextNode node = new TextNode(text);
             PrependChild(node);
             return this;
         }
@@ -554,7 +785,7 @@ namespace Supremes.Nodes
         public Element Append(string html)
         {
             Validate.NotNull(html);
-            IReadOnlyList<Node> nodes = Parser.ParseFragment(html, this, BaseUri);
+            IReadOnlyList<Node> nodes = NodeUtils.Parser(this).ParseFragmentInput(html, this, BaseUri);
             AddChildren(nodes.ToArray());
             return this;
         }
@@ -571,7 +802,7 @@ namespace Supremes.Nodes
         public Element Prepend(string html)
         {
             Validate.NotNull(html);
-            IReadOnlyList<Node> nodes = Parser.ParseFragment(html, this, BaseUri);
+            var nodes = NodeUtils.Parser(this).ParseFragmentInput(html, this, BaseUri);
             AddChildren(0, nodes.ToArray());
             return this;
         }
@@ -627,7 +858,7 @@ namespace Supremes.Nodes
         /// Any attributes are left as-is.
         /// </remarks>
         /// <returns>this element</returns>
-        public Element Empty()
+        public override Node Empty()
         {
             childNodes.Clear();
             return this;
@@ -662,25 +893,35 @@ namespace Supremes.Nodes
             {
                 if (Id.Length > 0)
                 {
-                    return "#" + Id;
+                    // prefer to return the ID - but check that it's actually unique first!
+                    string idSel = "#" + TokenQueue.EscapeCssIdentifier(Id);
+                    Document doc = OwnerDocument;
+                    if (doc != null) {
+                        Elements els = doc.Select(idSel);
+                        if (els.Count == 1 && els[0] == this) // otherwise, continue to the nth-child impl
+                            return idSel;
+                    } else {
+                        return idSel; // no ownerdoc, return the ID selector
+                    }
                 }
-                StringBuilder selector = new StringBuilder(TagName);
-                string classes = string.Join(".", ClassNames);
+                // Escape tagname, and translate HTML namespace ns:tag to CSS namespace syntax ns|tag
+                string tagName = TokenQueue.EscapeCssIdentifier(TagName).Replace("\\:", "|");
+                StringBuilder selector = StringUtil.BorrowBuilder().Append(tagName);
+                // string classes = StringUtil.Join(classNames().stream().map(TokenQueue::escapeCssIdentifier).iterator(), ".");
+                StringUtil.StringJoiner escapedClasses = new StringUtil.StringJoiner(".");
+                foreach (string name in ClassNames) escapedClasses.Add(TokenQueue.EscapeCssIdentifier(name));
+                string classes = escapedClasses.Complete();
                 if (classes.Length > 0)
-                {
                     selector.Append('.').Append(classes);
-                }
-                if (Parent == null || Parent is Document)
-                {
-                    // don't add Document to selector, as will always have a html node
-                    return selector.ToString();
-                }
+
+                if (Parent is null or Document) // don't add Document to selector, as will always have a html node
+                    return StringUtil.ReleaseBuilder(selector);
+
                 selector.Insert(0, " > ");
                 if (Parent.Select(selector.ToString()).Count > 1)
-                {
-                    selector.Append(string.Format(":nth-child({0})", ElementSiblingIndex + 1));
-                }
-                return Parent.CssSelector + selector.ToString();
+                    selector.Append($":nth-child({ElementSiblingIndex + 1})");
+
+                return Parent.CssSelector + StringUtil.ReleaseBuilder(selector);
             }
         }
 
@@ -700,11 +941,11 @@ namespace Supremes.Nodes
                 {
                     return new Elements(0);
                 }
-                IList<Element> elements = Parent.Children;
+                IList<Element> elements = Parent.ChildElementsList();
                 Elements siblings = new Elements(elements.Count - 1);
                 foreach (Element el in elements)
                 {
-                    if (el != this)
+                    if (!Equals(el, this))
                     {
                         siblings.Add(el);
                     }
@@ -744,18 +985,19 @@ namespace Supremes.Nodes
                 {
                     return null;
                 }
-                IList<Element> siblings = Parent.Children;
+                IList<Element> siblings = Parent.ChildElementsList();
                 int index = IndexInList(this, siblings);
-                Validate.IsTrue(index >= 0);
-                if (siblings.Count > index + 1)
-                {
-                    return siblings[index + 1];
-                }
-                else
-                {
-                    return null;
-                }
+                return siblings.Count > index + 1 ? siblings[index + 1] : null;
             }
+        }
+        
+        /// <summary>
+        /// Get each of the sibling elements that come after this element.
+        /// </summary>
+        /// <returns>each of the element siblings after this element, or an empty list if there are no next sibling elements</returns>
+        public Elements NextElementSiblings()
+        {
+            return NextElementSiblings(true);
         }
 
         /// <summary>
@@ -773,7 +1015,6 @@ namespace Supremes.Nodes
                 }
                 IList<Element> siblings = Parent.Children;
                 int index = IndexInList(this, siblings);
-                Validate.IsTrue(index >= 0);
                 if (index > 0)
                 {
                     return siblings[index - 1];
@@ -783,6 +1024,22 @@ namespace Supremes.Nodes
                     return null;
                 }
             }
+        }
+        
+        /// <summary>
+        /// Get each of the element siblings before this element.
+        /// </summary>
+        /// <returns>the previous element siblings, or an empty list if there are none.</returns>
+        public Elements PreviousElementSiblings() {
+            return NextElementSiblings(false);
+        }
+        
+        private Elements NextElementSiblings(bool next) {
+            Elements els = new Elements();
+            if (parentNode == null)
+                return  els;
+            els.Add(this);
+            return next ?  els.NextAll() : els.PrevAll();
         }
 
         /// <summary>
@@ -794,9 +1051,8 @@ namespace Supremes.Nodes
         {
             get
             {
-                // todo: should firstSibling() exclude this?
-                IList<Element> siblings = Parent.Children;
-                return siblings.Count > 1 ? siblings[0] : null;
+                IList<Element> siblings = Parent?.ChildElementsList();
+                return siblings is { Count: > 1 } ? siblings[0] : this;
             }
         }
 
@@ -807,17 +1063,7 @@ namespace Supremes.Nodes
         /// I.e. if this is the first element sibling, returns 0.
         /// </remarks>
         /// <returns>position in element sibling list</returns>
-        public int ElementSiblingIndex
-        {
-            get
-            {
-                if (Parent == null)
-                {
-                    return 0;
-                }
-                return IndexInList(this, Parent.Children);
-            }
-        }
+        public int ElementSiblingIndex => Parent == null ? 0 : IndexInList(this, Parent.ChildElementsList());
 
         /// <summary>
         /// Gets the last element sibling of this element
@@ -829,16 +1075,23 @@ namespace Supremes.Nodes
         {
             get
             {
-                IList<Element> siblings = Parent.Children;
-                return siblings.Count > 1 ? siblings[siblings.Count - 1] : null;
+                IList<Element> siblings = Parent?.ChildElementsList();
+                return siblings is { Count :> 1 } ? siblings[siblings.Count - 1] : this;
             }
         }
 
         private static int IndexInList(Element search, IList<Element> elements)
         {
-            Validate.NotNull(search);
-            Validate.NotNull(elements);
-            return elements.IndexOf(search); // compare using Equals() method
+            int size = elements.Count;
+            for (int i = 0; i < size; i++)
+            {
+                if (elements[i] == search)
+                {
+                    return i;
+                }
+            }
+
+            return 0;
         }
 
         // DOM type methods

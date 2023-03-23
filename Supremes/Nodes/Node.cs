@@ -20,11 +20,9 @@ namespace Supremes.Nodes
     {
         internal Node parentNode;
 
-        internal List<Node> EmptyNodes = new List<Node>();
-
-        internal Attributes attributes;
-
-        internal string baseUri;
+        internal static readonly List<Node> EmptyNodes = new();
+        
+        internal const string EmptyString = "";
 
         internal int siblingIndex;
 
@@ -43,9 +41,17 @@ namespace Supremes.Nodes
         /// Use for debugging purposes and not logic switching (for that, use instanceof).
         /// </remarks>
         /// <returns>node name</returns>
-        internal abstract string NodeName { get; }
+        public abstract string NodeName { get; }
         
+        /// <summary>
+        /// Get the normalized name of this node. For node types other than Element, this is the same as {@link #nodeName()}.
+        /// For an Element, will be the lower-cased tag name.
+        /// </summary>
+        public string NormalName => NodeName;
+        
+        /// <summary>
         /// Check if this Node has an actual Attributes object.
+        /// </summary> 
         protected abstract bool HasAttributes { get; }
         
         /// Checks if this node has a parent. Nodes won't have parents if (e.g.) they are newly created and not added as a child
@@ -71,21 +77,23 @@ namespace Supremes.Nodes
         public virtual string Attr(string attributeKey)
         {
             Validate.NotNull(attributeKey);
-            if (attributes.ContainsKey(attributeKey))
+            if (!HasAttributes)
             {
-                return attributes[attributeKey];
+                return EmptyString;
             }
-            else
+
+            var val = Attributes.GetIgnoreCase(attributeKey);
+            if (val.Length > 0)
             {
-                if (attributeKey.ToLower().StartsWith("abs:", StringComparison.Ordinal))
-                {
-                    return AbsUrl(attributeKey.Substring("abs:".Length)); /*substring*/
-                }
-                else
-                {
-                    return string.Empty;
-                }
+                return val;
             }
+
+            if (attributeKey.StartsWith("abs:", StringComparison.Ordinal))
+            {
+                return AbsUrl(attributeKey.Substring("abs:".Length));
+            }
+
+            return EmptyString;
         }
 
         /// <summary>
@@ -94,13 +102,13 @@ namespace Supremes.Nodes
         /// <returns>
         /// attributes (which implements iterable, in same order as presented in original HTML).
         /// </returns>
-        public virtual Attributes Attributes => attributes;
+        public abstract Attributes Attributes { get; }
         
         /// <summary>
         ///  Get the number of attributes that this Node has.
         /// </summary>
         /// <returns>the number of attributes</returns>
-        public virtual int AttributesSize => HasAttributes() ? Attributes.Count : 0;
+        public int AttributesSize => HasAttributes ? Attributes.Count : 0;
 
         /// <summary>
         /// Set an attribute (key=value).
@@ -113,7 +121,8 @@ namespace Supremes.Nodes
         /// <returns>this (for chaining)</returns>
         public virtual Node Attr(string attributeKey, string attributeValue)
         {
-            attributes[attributeKey] = attributeValue;
+            attributeKey = NodeUtils.Parser(this).Settings.NormalizeAttribute(attributeKey);
+            Attributes.PutIgnoreCase(attributeKey, attributeValue);
             return this;
         }
 
@@ -125,15 +134,19 @@ namespace Supremes.Nodes
         public virtual bool HasAttr(string attributeKey)
         {
             Validate.NotNull(attributeKey);
+            if (!HasAttributes)
+            {
+                return false;
+            }
             if (attributeKey.StartsWith("abs:", StringComparison.Ordinal))
             {
                 string key = attributeKey.Substring("abs:".Length); /*substring*/
-                if (attributes.ContainsKey(key) && !AbsUrl(key).Equals(string.Empty))
+                if (Attributes.ContainsKeyIgnoreCase(key) && !AbsUrl(key).Equals(string.Empty))
                 {
                     return true;
                 }
             }
-            return attributes.ContainsKey(attributeKey);
+            return Attributes.ContainsKeyIgnoreCase(attributeKey);
         }
 
         /// <summary>
@@ -144,7 +157,10 @@ namespace Supremes.Nodes
         public virtual Node RemoveAttr(string attributeKey)
         {
             Validate.NotNull(attributeKey);
-            attributes.Remove(attributeKey);
+            if (HasAttributes)
+            {
+                Attributes.RemoveIgnoreCase(attributeKey);
+            }
             return this;
         }
         
@@ -256,7 +272,7 @@ namespace Supremes.Nodes
         /// <returns>list of children. If no children, returns an empty list.</returns>
         public IList<Node> ChildNodes()
         {
-            if (ChildNodeSize() == 0)
+            if (ChildNodeSize == 0)
                 return EmptyNodes;
 
             List<Node> children = EnsureChildNodes();
@@ -290,18 +306,18 @@ namespace Supremes.Nodes
         public abstract int ChildNodeSize { get; }
 
         internal Node[] ChildNodesAsArray => EnsureChildNodes().ToArray();
-        
+
         /// <summary>
         ///  Delete all this node's children.
         /// </summary>
         /// <returns>this node, for chaining</returns>
-        public abstract Node Empty { get; }
+        public abstract Node Empty();
 
         /// <summary>
         /// Gets this node's parent node.
         /// </summary>
         /// <returns>parent node; or null if no parent.</returns>
-        public Node Parent => parentNode;
+        public virtual Node Parent => parentNode;
 
         /// <summary>
         /// Gets this node's parent node. Not overridable by extending classes, so useful if you really just need the Node type.
@@ -376,7 +392,7 @@ namespace Supremes.Nodes
         {
             Validate.NotNull(node);
             Validate.NotNull(parentNode);
-            if (node.parentNode == parentNode)
+            if (Equals(node.parentNode, parentNode))
             {
                 node.Remove();
             }
@@ -406,7 +422,7 @@ namespace Supremes.Nodes
         {
             Validate.NotNull(node);
             Validate.NotNull(parentNode);
-            if (node.parentNode == parentNode)
+            if (Equals(node.parentNode, parentNode))
             {
                 node.Remove();
             }
@@ -419,7 +435,7 @@ namespace Supremes.Nodes
             Validate.NotNull(html);
             Validate.NotNull(parentNode);
             Element context = Parent as Element;
-            IReadOnlyList<Node> nodes = NodeUtils.Parser(this).ParseFragmentInput(html, context, BaseUri());
+            IReadOnlyList<Node> nodes = NodeUtils.Parser(this).ParseFragmentInput(html, context, BaseUri);
             parentNode.AddChildren(index, nodes.ToArray());
         }
 
@@ -436,7 +452,7 @@ namespace Supremes.Nodes
         {
             Validate.NotEmpty(html);
             Element context = Parent as Element ?? this as Element;
-            IReadOnlyList<Node> wrapChildren = NodeUtils.Parser(this).ParseFragmentInput(html, context, BaseUri());
+            IReadOnlyList<Node> wrapChildren = NodeUtils.Parser(this).ParseFragmentInput(html, context, BaseUri);
             Node wrapNode = wrapChildren[0];
             if (!(wrapNode is Element wrap))
             {
@@ -453,7 +469,7 @@ namespace Supremes.Nodes
                 {
                     Node remainder = (Node)wrapChildren[i];
                     // if no parent, this could be the wrap node, so skip
-                    if (wrap == remainder)
+                    if (Equals(wrap, remainder))
                         continue;
 
                     remainder.parentNode?.RemoveChild(remainder);
@@ -493,18 +509,24 @@ namespace Supremes.Nodes
         {
             Validate.NotNull(parentNode);
             Node firstChild = FirstChild();
-            parentNode.AddChildren(siblingIndex, this.ChildNodesAsArray());
+            parentNode.AddChildren(SiblingIndex, this.ChildNodesAsArray);
             this.Remove();
             return firstChild;
         }
 
         private Element GetDeepChild(Element el)
         {
-            while (el.ChildrenSize() > 0) {
-                el = el.ChildElementsList().get(0);
+            while (el.ChildrenSize > 0) {
+                el = el.ChildElementsList()[0];
             }
             return el;
         }
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        internal virtual void NodelistChanged(){}
+        
 
         /// <summary>
         /// Replace this node in the DOM with the supplied node.
@@ -514,78 +536,106 @@ namespace Supremes.Nodes
         {
             Validate.NotNull(@in);
             Validate.NotNull(parentNode);
-            parentNode.ReplaceChild(this, (Supremes.Nodes.Node)@in);
+            parentNode.ReplaceChild(this, @in);
         }
 
         internal void SetParentNode(Node parentNode)
         {
-            if (this.parentNode != null)
-            {
-                this.parentNode.RemoveChild(this);
-            }
+            Validate.NotNull(parentNode);
+            this.parentNode?.RemoveChild(this);
             this.parentNode = parentNode;
         }
 
-        internal void ReplaceChild(Supremes.Nodes.Node @out, Supremes.Nodes.Node @in)
+        internal void ReplaceChild(Node @out, Supremes.Nodes.Node @in)
         {
-            Validate.IsTrue(@out.parentNode == this);
+            Validate.IsTrue(Equals(@out.parentNode, this));
             Validate.NotNull(@in);
-            if (@in.parentNode != null)
-            {
-                @in.parentNode.RemoveChild(@in);
-            }
+            @in.parentNode?.RemoveChild(@in);
             int index = @out.SiblingIndex;
-            childNodes[index] = @in;
+            EnsureChildNodes()[index] = @in;
             @in.parentNode = this;
             @in.SiblingIndex = index;
             @out.parentNode = null;
         }
 
-        internal void RemoveChild(Supremes.Nodes.Node @out)
+        internal void RemoveChild(Node @out)
         {
-            Validate.IsTrue(@out.parentNode == this);
+            Validate.IsTrue(Equals(@out.parentNode, this));
             int index = @out.SiblingIndex;
-            childNodes.RemoveAt(index);
-            ReindexChildren();
+            EnsureChildNodes().RemoveAt(index);
+            ReindexChildren(index);
             @out.parentNode = null;
         }
 
         internal void AddChildren(params Node[] children)
         {
+            List<Node> nodes = EnsureChildNodes();
             //most used. short circuit addChildren(int), which hits reindex children and array copy
             foreach (Node child in children)
             {
-                Supremes.Nodes.Node childImpl = (Supremes.Nodes.Node)child;
+                Node childImpl = child;
                 ReparentChild(childImpl);
-                childNodes.Add(childImpl);
-                childImpl.SiblingIndex = childNodes.Count - 1;
+                nodes.Add(childImpl);
+                childImpl.SiblingIndex = nodes.Count - 1;
             }
         }
 
         internal void AddChildren(int index, params Node[] children)
         {
-            Validate.NoNullElements(children);
-            for (int i = children.Length - 1; i >= 0; i--)
-            {
-                Supremes.Nodes.Node @in = (Supremes.Nodes.Node)children[i];
-                ReparentChild(@in);
-                childNodes.Insert(index, @in);
+            Validate.NotNull(children);
+            if (children.Length == 0) {
+                return;
             }
-            ReindexChildren();
+            List<Node> nodes = EnsureChildNodes();
+
+            // Fast path - if used as a wrap (index=0, children = child[0].parent.children - do inplace
+            Node firstParent = children[0].Parent;
+            if (firstParent != null && firstParent.ChildNodeSize == children.Length) {
+                bool sameList = true;
+                List<Node> firstParentNodes = firstParent.EnsureChildNodes();
+                // Identity check contents to see if same
+                int i = children.Length;
+                while (i-- > 0) {
+                    if (!Equals(children[i], firstParentNodes[i])) {
+                        sameList = false;
+                        break;
+                    }
+                }
+                if (sameList) { // Moving, so OK to empty firstParent and short-circuit
+                    bool wasEmpty = ChildNodeSize == 0;
+                    firstParent.Empty();
+                    nodes.InsertRange(index, children);
+                    i = children.Length;
+                    while (i-- > 0) {
+                        children[i].parentNode = this;
+                    }
+                    if (!(wasEmpty && children[0].SiblingIndex == 0)) // Skip reindexing if we just moved
+                        ReindexChildren(index);
+                    return;
+                }
+            }
+            
+            Validate.NoNullElements(children);
+            foreach (var child in children)
+            {
+                ReparentChild(child);
+            }
+            nodes.InsertRange(index, children);
+            ReindexChildren(index);
         }
 
-        private void ReparentChild(Supremes.Nodes.Node child)
+        internal void ReparentChild(Node child)
         {
-            if (child.parentNode != null)
-            {
-                child.parentNode.RemoveChild(child);
-            }
+            child.parentNode?.RemoveChild(child);
             child.SetParentNode(this);
         }
 
-        private void ReindexChildren()
+        private void ReindexChildren(int start)
         {
-            for (int i = 0; i < childNodes.Count; i++)
+            int size = ChildNodeSize;
+            if (size == 0) return;
+            List<Node> childNodes = EnsureChildNodes();
+            for (int i = start; i < size; i++)
             {
                 childNodes[i].SiblingIndex = i;
             }
@@ -607,13 +657,13 @@ namespace Supremes.Nodes
             {
                 if (parentNode == null)
                 {
-                    return new ReadOnlyCollection<Node>(new Node[0]);
+                    return new ReadOnlyCollection<Node>(Array.Empty<Node>());
                 }
-                IList<Node> nodes = parentNode.childNodes;
+                IList<Node> nodes = parentNode.EnsureChildNodes();
                 List<Node> siblings = new List<Node>(nodes.Count - 1);
                 foreach (Node node in nodes)
                 {
-                    if (node != this)
+                    if (!Equals(node, this))
                     {
                         siblings.Add(node);
                     }
@@ -634,17 +684,10 @@ namespace Supremes.Nodes
                 {
                     return null; // root
                 }
-                IList<Node> siblings = parentNode.ChildNodes();
-                int index = SiblingIndex;
+                IList<Node> siblings = parentNode.EnsureChildNodes();
+                int index = SiblingIndex + 1;
                 Validate.NotNull(index);
-                if (siblings.Count > index + 1)
-                {
-                    return siblings[index + 1];
-                }
-                else
-                {
-                    return null;
-                }
+                return siblings.Count > index ? siblings[index] : null;
             }
         }
 
@@ -660,17 +703,8 @@ namespace Supremes.Nodes
                 {
                     return null; // root
                 }
-                IList<Node> siblings = parentNode.ChildNodes();
                 int index = SiblingIndex;
-                Validate.NotNull(index);
-                if (index > 0)
-                {
-                    return siblings[index - 1];
-                }
-                else
-                {
-                    return null;
-                }
+                return index > 0 ? parentNode.EnsureChildNodes()[index - 1] : null;
             }
         }
 
@@ -682,19 +716,15 @@ namespace Supremes.Nodes
         /// </remarks>
         /// <returns>position in node sibling list</returns>
         /// <seealso cref="Element.ElementSiblingIndex">Element.ElementSiblingIndex</seealso>
-        public int SiblingIndex
-        {
-            get { return siblingIndex; }
-            internal set { siblingIndex = value; }
-        }
-        
+        public int SiblingIndex { get; internal set; }
+
         /// <summary>
         /// Gets the first child node of this node, or {@code null} if there is none. This could be any Node type, such as an
         /// Element, TextNode, Comment, etc. Use {@link Element#firstElementChild()} to get the first Element child.
         /// </summary>
         /// <returns>the first child node, or null if there are no children.</returns>
         public Node FirstChild() {
-            if (ChildNodeSize() == 0) return null;
+            if (ChildNodeSize == 0) return null;
             return EnsureChildNodes()[0];
         }
         
@@ -703,7 +733,7 @@ namespace Supremes.Nodes
         /// </summary>
         /// <returns>the last child node, or null if there are no children.</returns>
         public Node LastChild() {
-            int size = ChildNodeSize();
+            int size = ChildNodeSize;
             if (size == 0) return null;
             List<Node> children = EnsureChildNodes();
             return children[size - 1];
@@ -718,11 +748,35 @@ namespace Supremes.Nodes
         internal Node Traverse(INodeVisitor nodeVisitor)
         {
             Validate.NotNull(nodeVisitor);
-            NodeTraversor traversor = new NodeTraversor(nodeVisitor);
-            traversor.Traverse(this);
+            NodeTraversor.Traverse(nodeVisitor, this);
             return this;
         }
 
+        /// <summary>
+        /// Perform the supplied action on this Node and each of its descendants, during a depth-first traversal. Nodes may be
+        /// inspected, changed, added, replaced, or removed.
+        /// </summary>
+        /// <param name="action">action the function to perform on the node</param>
+        /// <returns>this Node, for chaining</returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public Node ForEachNode(Action<Node> action) {
+            if (action == null) throw new ArgumentNullException(nameof(action));
+            NodeTraversor.Traverse(new LambdaNodeVisitor((node, depth) => action(node)), this);
+            return this;
+        }
+        
+        /// <summary>
+        /// Perform a depth-first filtering through this node and its descendants.
+        /// </summary>
+        /// <param name="nodeFilter">the filter callbacks to perform on each node</param>
+        /// <returns>this node, for chaining</returns>
+        public Node Filter(NodeFilter nodeFilter) {
+            Validate.NotNull(nodeFilter);
+            NodeTraversor.Filter(nodeFilter, this);
+            return this;
+        }
+
+        
         /// <summary>
         /// Get the outer HTML of this node.
         /// </summary>
@@ -731,15 +785,15 @@ namespace Supremes.Nodes
         {
             get
             {
-                StringBuilder accum = new StringBuilder(128);
+                StringBuilder accum = StringUtil.BorrowBuilder();
                 AppendOuterHtmlTo(accum);
-                return accum.ToString();
+                return StringUtil.ReleaseBuilder(accum);
             }
         }
 
         internal void AppendOuterHtmlTo(StringBuilder accum)
         {
-            new NodeTraversor(new Node.OuterHtmlVisitor(accum, GetOutputSettings())).Traverse(this);
+            NodeTraversor.Traverse(new OuterHtmlVisitor(accum, NodeUtils.OutputSettings(this)), this);
         }
 
         internal DocumentOutputSettings GetOutputSettings()
@@ -761,6 +815,47 @@ namespace Supremes.Nodes
         internal abstract void AppendOuterHtmlTailTo(StringBuilder accum, int depth, DocumentOutputSettings @out);
 
         /// <summary>
+        /// Get the source range (start and end positions) in the original input source that this node was parsed from. Position
+        /// tracking must be enabled prior to parsing the content. For an Element, this will be the positions of the start tag.
+        /// </summary>
+        /// <returns>the range for the start of the node.</returns>
+        public Range SourceRange() {
+            return Range.Of(this, true);
+        }
+        
+        /// <summary>
+        /// Test if this node is not null and has the supplied normal name.
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="normalName"></param>
+        /// <returns></returns>
+        internal static bool IsNode(Node node, string normalName) {
+            return node != null && node.NormalName.Equals(normalName);
+        }
+
+        /// <summary>
+        /// Test if this node has the supplied normal name.
+        /// </summary>
+        /// <param name="normalName"></param>
+        /// <returns></returns>
+        public bool IsNode(string normalName) {
+            return NormalName.Equals(normalName);
+        }
+
+        /// <summary>
+        /// Test if this node is the first child, or first following blank text.
+        /// </summary>
+        /// <returns></returns>
+        public bool IsEffectivelyFirst() {
+            if (siblingIndex == 0) return true;
+            if (siblingIndex == 1) {
+                Node prev = PreviousSibling;
+                return prev is TextNode { IsBlank: true };
+            }
+            return false;
+        }
+        
+        /// <summary>
         /// Converts the value of this instance to a string.
         /// </summary>
         /// <returns></returns>
@@ -771,7 +866,7 @@ namespace Supremes.Nodes
 
         internal void Indent(StringBuilder accum, int depth, DocumentOutputSettings @out)
         {
-            accum.Append("\n").Append(StringUtil.Padding(depth * @out.IndentAmount));
+            accum.Append("\n").Append(StringUtil.Padding(depth * @out.IndentAmount, @out.MaxPaddingWidth));
         }
 
         /// <summary>
@@ -781,12 +876,7 @@ namespace Supremes.Nodes
         /// <returns></returns>
         public override bool Equals(object obj)
         {
-            if (this == obj)
-            {
-                return true;
-            }
-            // todo: have nodes hold a child index, compare against that and parent (not children)
-            return false;
+            return this == obj;
         }
 
         /// <summary>
@@ -795,14 +885,23 @@ namespace Supremes.Nodes
         /// <returns></returns>
         public override int GetHashCode()
         {
-            int result = parentNode != null ? parentNode.GetHashCode() : 0;
-            // not children, or will block stack as they go back up to parent)
-            unchecked
-            {
-                result = 31 * result + (attributes != null ? attributes.GetHashCode() : 0);
-            }
-            return result;
+            return base.GetHashCode();
         }
+        
+        /// <summary>
+        /// Check if this node has the same content as another node. A node is considered the same if its name, attributes and content match the
+        /// other node; particularly its position in the tree does not influence its similarity.
+        /// </summary>
+        /// <param name="o">other object to compare to</param>
+        /// <returns>true if the content of this node is the same as the other</returns>
+        public bool HasSameValue(object o)
+        {
+            if (this == o) return true;
+            if (o == null || GetType() != o.GetType()) return false;
+
+            return this.OuterHtml.Equals(((Node)o).OuterHtml);
+        }
+
 
         /// <summary>
         /// Create a stand-alone, deep copy of this node, and all of its children.
@@ -828,14 +927,24 @@ namespace Supremes.Nodes
             {
                 Node currParent = nodesToProcess.First.Value;
                 nodesToProcess.RemoveFirst();
-                for (int i = 0; i < currParent.childNodes.Count; i++)
+                for (int i = 0; i < currParent.ChildNodeSize; i++)
                 {
-                    Node childClone = ((Node)currParent.childNodes[i]).DoClone(currParent);
-                    currParent.childNodes[i] = childClone;
+                    List<Node> childNodes = currParent.EnsureChildNodes();
+                    Node childClone = childNodes[i].DoClone(currParent);
+                    childNodes[i] = childClone;
                     nodesToProcess.AddLast(childClone);
                 }
             }
             return thisClone;
+        }
+        
+        /// <summary>
+        /// Create a stand-alone, shallow copy of this node. None of its children (if any) will be cloned, and it will have
+        /// no parent or sibling nodes.
+        /// </summary>
+        /// <returns>a single independent copy of this node</returns>
+        public Node ShallowClone() {
+            return DoClone(null);
         }
 
         internal Node DoClone(Node parent)
@@ -843,13 +952,16 @@ namespace Supremes.Nodes
             Node clone = (Node)this.MemberwiseClone();
             clone.parentNode = parent;
             // can be null, to create an orphan split
-            clone.siblingIndex = parent == null ? 0 : siblingIndex;
-            clone.attributes = attributes != null ? attributes.Clone() : null;
-            clone.baseUri = baseUri;
-            clone.childNodes = new List<Node>(childNodes.Count);
-            foreach (Node child in childNodes)
+            clone.SiblingIndex = parent == null ? 0 : SiblingIndex;
+            if (parent == null && this is not Document)
             {
-                clone.childNodes.Add(child);
+                var doc = OwnerDocument;
+                if (doc != null)
+                {
+                    var docClone = doc.ShallowClone();
+                    clone.parentNode = docClone;
+                    docClone.EnsureChildNodes().Add(clone);
+                }
             }
             return clone;
         }
@@ -864,11 +976,12 @@ namespace Supremes.Nodes
             {
                 this.accum = accum;
                 this.@out = @out;
+                @out.PrepareEncoder();
             }
 
             public void Head(Node node, int depth)
             {
-                ((Node)node).AppendOuterHtmlHeadTo(accum, depth, @out);
+                node.AppendOuterHtmlHeadTo(accum, depth, @out);
             }
 
             public void Tail(Node node, int depth)
@@ -876,7 +989,7 @@ namespace Supremes.Nodes
                 if (!node.NodeName.Equals("#text"))
                 {
                     // saves a void hit.
-                    ((Node)node).AppendOuterHtmlTailTo(accum, depth, @out);
+                    node.AppendOuterHtmlTailTo(accum, depth, @out);
                 }
             }
         }

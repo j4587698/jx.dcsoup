@@ -32,6 +32,27 @@ namespace Supremes.Helper
                 throw new ArgumentException(msg);
             }
         }
+        
+        public static object EnsureNotNull(object obj) {
+            if (obj == null)
+                throw new ValidationException("Object must not be null");
+            else return obj;
+        }
+        
+        /// <summary>
+        /// Verifies the input object is not null, and returns that object. Effectively this casts a nullable object to a non-
+        /// null object. (Works around lack of Objects.requestNonNull in Android version.)
+        /// </summary>
+        /// <param name="obj">nullable object to case to not-null</param>
+        /// <param name="msg">the String format message to include in the validation exception when thrown</param>
+        /// <param name="args">the arguments to the msg</param>
+        /// <returns>the object, or throws an exception if it is null</returns>
+        /// <exception cref="ValidationException">if the object is null</exception>
+        public static object EnsureNotNull(object obj, string msg, params object[] args) {
+            if (obj == null)
+                throw new ValidationException(string.Format(msg, args));
+            else return obj;
+        }
 
         /// <summary>
         /// Validates that the value is true

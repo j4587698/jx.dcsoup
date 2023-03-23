@@ -168,7 +168,7 @@ namespace Supremes.Nodes
         /// <param name="key">case sensitive key</param>
         /// <param name="value">object value</param>
         /// <returns>these attributes</returns>
-        Attributes PutUserData(String key, Object value) {
+        internal Attributes PutUserData(String key, Object value) {
             Validate.NotNull(key);
             if (!IsInternalKey(key)) key = InternalKey(key);
             Validate.NotNull(value);
@@ -185,7 +185,7 @@ namespace Supremes.Nodes
         /// </summary>
         /// <param name="key"></param>
         /// <param name="value"></param>
-        void PutIgnoreCase(string key, string value) {
+        internal void PutIgnoreCase(string key, string value) {
             int i = IndexOfKeyIgnoreCase(key);
             if (i != NotFound) {
                 vals[i] = value;

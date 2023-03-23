@@ -1,5 +1,6 @@
 ﻿using NUnit.Framework;
 using Supremes.Helper;
+using Supremes.Parsers;
 
 #if (NETSTANDARD1_3)
 namespace Supremes.Test.Helper

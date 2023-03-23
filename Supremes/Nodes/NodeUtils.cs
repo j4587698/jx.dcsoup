@@ -45,16 +45,16 @@ public class NodeUtils
     /// <param name="el"></param>
     /// <param name="nodeType"></param>
     /// <returns></returns>
-    // public static List<T> SelectXpath<T>(string xpath, Element el, Type nodeType) where T : Node
-    // {
-    //     Validate.NotEmpty(xpath);
-    //     Validate.NotNull(el);
-    //     Validate.NotNull(nodeType);
-    //
-    //     W3CDom w3c = new W3CDom().NamespaceAware(false);
-    //     org.w3c.dom.Document wDoc = w3c.FromJsoup(el);
-    //     org.w3c.dom.Node contextNode = w3c.ContextNode(wDoc);
-    //     NodeList nodeList = w3c.SelectXpath(xpath, contextNode);
-    //     return w3c.SourceNodes(nodeList, nodeType);
-    // }
+    public static List<T> SelectXpath<T>(string xpath, Element el, Type nodeType) where T : Node
+    {
+        Validate.NotEmpty(xpath);
+        Validate.NotNull(el);
+        Validate.NotNull(nodeType);
+    
+        W3CDom w3c = new W3CDom().NamespaceAware(false);
+        org.w3c.dom.Document wDoc = w3c.FromJsoup(el);
+        org.w3c.dom.Node contextNode = w3c.ContextNode(wDoc);
+        NodeList nodeList = w3c.SelectXpath(xpath, contextNode);
+        return w3c.SourceNodes(nodeList, nodeType);
+    }
 }

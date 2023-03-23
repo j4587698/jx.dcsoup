@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -29,26 +30,108 @@ namespace Supremes.Helper
         }; // memoised padding up to 10
 
         /// <summary>
-        /// Returns space padding
+        /// Join a collection of strings by a separator
+        /// </summary>
+        /// <param name="strings">collection of string objects</param>
+        /// <param name="seq">string to place between strings</param>
+        /// <returns>joined string</returns>
+        public static string Join(IEnumerable strings, string seq)
+        {
+            return Join(strings.GetEnumerator(), seq);
+        }
+        
+        /// <summary>
+        /// Join a collection of strings by a separator
+        /// </summary>
+        /// <param name="strings">iterator of string objects</param>
+        /// <param name="sep">string to place between strings</param>
+        /// <returns>joined string</returns>
+        public static String Join(IEnumerator strings, String sep) {
+            if (!strings.MoveNext())
+                return "";
+            String start = strings.Current?.ToString();
+            if (!strings.MoveNext()) // only one, avoid builder
+                return start;
+
+            StringBuilder sb = new StringBuilder(start);
+            while (strings.MoveNext()) {
+                sb.Append(sep).Append(strings.Current);
+            }
+            return sb.ToString();
+        }
+        
+        /// <summary>
+        /// A StringJoiner allows incremental / filtered joining of a set of stringable objects.
+        /// </summary>
+        public class StringJoiner
+        {
+            private StringBuilder sb = BorrowBuilder();
+            
+            private readonly string separator;
+            
+            private bool first = true;
+            
+            /// <summary>
+            /// Create a new joiner, that uses the specified separator. MUST call {@link #complete()} or will leak a thread
+            /// </summary>
+            /// <param name="separator">the token to insert between strings</param>
+            public StringJoiner(string separator)
+            {
+                this.separator = separator;
+            }
+            
+            /// <summary>
+            /// Add another item to the joiner, will be separated
+            /// </summary>
+            /// <param name="stringy"></param>
+            /// <returns></returns>
+            public StringJoiner Add(object stringy) {
+                if (!first)
+                    sb.Append(separator);
+                sb.Append(stringy);
+                first = false;
+                return this;
+            }
+            
+            /// <summary>
+            /// Append content to the current item; not separated
+            /// </summary>
+            /// <param name="stringy"></param>
+            /// <returns></returns>
+            public StringJoiner Append(object stringy) {
+                sb.Append(stringy);
+                return this;
+            }
+            
+            /// <summary>
+            /// Return the joined string, and release the builder back to the pool. This joiner cannot be reused.
+            /// </summary>
+            /// <returns></returns>
+            public string Complete() {
+                string str = ReleaseBuilder(sb);
+                sb = null;
+                return str;
+            }
+        }
+
+        /// <summary>
+        /// Returns space padding, up to a max of maxPaddingWidth.
         /// </summary>
         /// <param name="width">amount of padding desired</param>
+        /// <param name="maxPaddingWidth">maximum padding to apply. Set to {@code -1} for unlimited.</param>
         /// <returns>string of spaces * width</returns>
-        public static string Padding(int width)
+        public static string Padding(int width, int maxPaddingWidth = 30)
         {
-            if (width < 0)
-            {
-                throw new ArgumentException("width must be > 0");
-            }
+            Validate.IsTrue(width >= 0, "width must be >= 0");
+            Validate.IsTrue(maxPaddingWidth >= -1);
+            if (maxPaddingWidth != -1)
+                width = Math.Min(width, maxPaddingWidth);
             if (width < padding.Length)
-            {
-                return padding[width];
-            }
-            char[] @out = new char[width];
+                return padding[width];        
+            char[] outChars = new char[width];
             for (int i = 0; i < width; i++)
-            {
-                @out[i] = ' ';
-            }
-            return new string(@out);
+                outChars[i] = ' ';
+            return new string(outChars);
         }
 
         /// <summary>

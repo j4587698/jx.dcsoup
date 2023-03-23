@@ -1,4 +1,5 @@
-﻿using Supremes.Helper;
+﻿using System;
+using Supremes.Helper;
 using Supremes.Select;
 using System.Collections.Generic;
 using System.Linq;
@@ -46,13 +47,12 @@ namespace Supremes.Nodes
         /// <returns>a deep copy</returns>
         internal Elements Clone()
         {
-            Elements clone = (Elements)this.MemberwiseClone();
-            List<Element> elements = new List<Element>();
+            Elements elements = new Elements(Count);
             foreach (Element e in this)
             {
             	elements.Add((Element)e.Clone());
             }
-            return clone;
+            return elements;
         }
 
         // attribute methods
@@ -86,14 +86,20 @@ namespace Supremes.Nodes
         /// <returns>true if any of the elements have the attribute; false if none do.</returns>
         public bool HasAttr(string attributeKey)
         {
-            foreach (var element in this)
-            {
-                if (element.HasAttr(attributeKey))
-                {
-                    return true;
-                }
-            }
-            return false;
+            return this.Any(element => element.HasAttr(attributeKey));
+        }
+        
+        /// <summary>
+        /// Get the attribute value for each of the matched elements. If an element does not have this attribute, no value is
+        /// included in the result set for that element.
+        /// </summary>
+        /// <param name="attributeKey">the attribute name to return values for. You can add the {@code abs:} prefix to the key to
+        /// get absolute URLs from relative URLs, e.g.: {@code doc.select("a").eachAttr("abs:href")} .</param>
+        /// <returns>a list of each element's attribute value for the attribute</returns>
+        public List<string> EachAttr(string attributeKey) {
+            List<string> attrs = new List<string>(Count);
+            attrs.AddRange(from element in this where element.HasAttr(attributeKey) select element.Attr(attributeKey));
+            return attrs;
         }
 
         /// <summary>
@@ -183,14 +189,7 @@ namespace Supremes.Nodes
         /// <returns>true if any do, false if none do</returns>
         public bool HasClass(string className)
         {
-            foreach (Element element in this)
-            {
-                if (element.HasClass(className))
-                {
-                    return true;
-                }
-            }
-            return false;
+            return this.Any(element => element.HasClass(className));
         }
 
         /// <summary>
@@ -241,7 +240,7 @@ namespace Supremes.Nodes
         {
             get
             {
-                StringBuilder sb = new StringBuilder();
+                StringBuilder sb = StringUtil.BorrowBuilder();
                 foreach (Element element in this)
                 {
                     if (sb.Length != 0)
@@ -250,7 +249,7 @@ namespace Supremes.Nodes
                     }
                     sb.Append(element.Text);
                 }
-                return sb.ToString();
+                return StringUtil.ReleaseBuilder(sb);
             }
         }
 
@@ -258,20 +257,13 @@ namespace Supremes.Nodes
         /// Determine if any of the matched elements have a text content (that is not just whitespace).
         /// </summary>
         /// <returns></returns>
-        public bool HasText
-        {
-            get
-            {
-                foreach (Element element in this)
-                {
-                    if (element.HasText)
-                    {
-                        return true;
-                    }
-                }
-                return false;
-            }
-        }
+        public bool HasText => this.Any(element => element.HasText);
+
+        /// <summary>
+        /// Get the text content of each of the matched elements. If an element has no text, then it is not included in the
+        /// result.
+        /// </summary>
+        public IEnumerable<string> EachText => this.Where(x => x.HasText).Select(x => x.Text);
 
         /// <summary>
         /// Get the combined inner HTML of all matched elements.
@@ -292,7 +284,7 @@ namespace Supremes.Nodes
         {
             get
             {
-                StringBuilder sb = new StringBuilder();
+                StringBuilder sb = StringUtil.BorrowBuilder();
                 foreach (Element element in this)
                 {
                     if (sb.Length != 0)
@@ -301,7 +293,7 @@ namespace Supremes.Nodes
                     }
                     sb.Append(element.Html);
                 }
-                return sb.ToString();
+                return StringUtil.ReleaseBuilder(sb);
             }
             set
             {
@@ -322,7 +314,7 @@ namespace Supremes.Nodes
         {
             get
             {
-                StringBuilder sb = new StringBuilder();
+                StringBuilder sb = StringUtil.BorrowBuilder();
                 foreach (Element element in this)
                 {
                     if (sb.Length != 0)
@@ -331,7 +323,7 @@ namespace Supremes.Nodes
                     }
                     sb.Append(element.OuterHtml);
                 }
-                return sb.ToString();
+                return StringUtil.ReleaseBuilder(sb);
             }
         }
 
@@ -611,30 +603,8 @@ namespace Supremes.Nodes
         public Elements Not(string query)
         {
             Elements @out = Selector.Select(query, this);
-            return FilterOut(this, @out);
+            return Selector.FilterOut(this, @out);
             // exclude set. package open so that Elements can implement .not() selector.
-        }
-
-        private static Elements FilterOut(ICollection<Element> elements, ICollection<Element> outs)
-        {
-            Elements output = new Elements();
-            foreach (Element el in elements)
-            {
-                bool found = false;
-                foreach (Element @out in outs)
-                {
-                    if (el.Equals(@out))
-                    {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                {
-                    output.Add(el);
-                }
-            }
-            return output;
         }
 
         /// <summary>
@@ -652,8 +622,8 @@ namespace Supremes.Nodes
         public Elements Eq(int index)
         {
             return this.Count > index
-                ? new Supremes.Nodes.Elements(this[index])
-                : new Supremes.Nodes.Elements();
+                ? new Elements(this[index])
+                : new Elements();
         }
 
         /// <summary>
@@ -663,8 +633,103 @@ namespace Supremes.Nodes
         /// <returns>true if at least one element in the list matches the query.</returns>
         public bool Is(string query)
         {
-            Elements children = Select(query);
-            return children.Count > 0;
+            Evaluator evaluator = QueryParser.Parse(query);
+            return this.Any(element => element.Is(evaluator));
+        }
+
+        /// <summary>
+        /// Get the immediate next element sibling of each element in this list.
+        /// </summary>
+        /// <returns>next element siblings.</returns>
+        public Elements Next()
+        {
+            return Siblings(null, true, false);
+        }
+
+        /// <summary>
+        /// Get the immediate next element sibling of each element in this list, filtered by the query.
+        /// </summary>
+        /// <param name="query">CSS query to match siblings against</param>
+        /// <returns>next element siblings.</returns>
+        public Elements Next(string query)
+        {
+            return Siblings(query, true, false);
+        }
+        
+        /// <summary>
+        /// Get each of the following element siblings of each element in this list.
+        /// </summary>
+        /// <returns>all following element siblings.</returns>
+        public Elements NextAll()
+        {
+            return Siblings(null, true, true);
+        }
+        
+        /// <summary>
+        /// Get each of the following element siblings of each element in this list, that match the query.
+        /// </summary>
+        /// <param name="query">CSS query to match siblings against</param>
+        /// <returns>all following element siblings.</returns>
+        public Elements NextAll(string query)
+        {
+            return Siblings(query, true, true);
+        }
+
+        /// <summary>
+        /// Get the immediate previous element sibling of each element in this list.
+        /// </summary>
+        /// <returns>previous element siblings.</returns>
+        public Elements Prev()
+        {
+            return Siblings(null, false, false);
+        }
+
+        /// <summary>
+        /// Get the immediate previous element sibling of each element in this list, filtered by the query.
+        /// </summary>
+        /// <param name="query">CSS query to match siblings against</param>
+        /// <returns>previous element siblings.</returns>
+        public Elements Prev(string query)
+        {
+            return Siblings(query, false, false);
+        }
+
+        /// <summary>
+        /// Get each of the previous element siblings of each element in this list.
+        /// </summary>
+        /// <returns>all previous element siblings.</returns>
+        public Elements PrevAll()
+        {
+            return Siblings(null, false, true);
+        }
+        
+        /// <summary>
+        /// Get each of the previous element siblings of each element in this list, that match the query.
+        /// </summary>
+        /// <param name="query">CSS query to match siblings against</param>
+        /// <returns>all previous element siblings.</returns>
+        public Elements PrevAll(string query)
+        {
+            return Siblings(query, false, true);
+        }
+        
+        private Elements Siblings(string query, bool next, bool all) {
+            Elements els = new Elements();
+            Evaluator eval = query != null? QueryParser.Parse(query) : null;
+            foreach (Element e in this)
+            {
+                var a = e;
+                do {
+                    Element sib = next ? a.NextElementSibling : a.PreviousElementSibling;
+                    if (sib == null) break;
+                    if (eval == null)
+                        els.Add(sib);
+                    else if (sib.Is(eval))
+                        els.Add(sib);
+                    a = sib;
+                } while (all);
+            }
+            return els;
         }
 
         /// <summary>
@@ -709,6 +774,16 @@ namespace Supremes.Nodes
             NodeTraversor.Traverse(nodeVisitor, this);
             return this;
         }
+        
+        /// <summary>
+        /// Perform a depth-first filtering on each of the selected elements.
+        /// </summary>
+        /// <param name="nodeFilter">the filter callbacks to perform on each node</param>
+        /// <returns>this, for chaining</returns>
+        public Elements Filter(NodeFilter nodeFilter) {
+            NodeTraversor.Filter(nodeFilter, this);
+            return this;
+        }
 
         /// <summary>
         /// Get the
@@ -729,6 +804,47 @@ namespace Supremes.Nodes
                 return forms.AsReadOnly();
             }
         }
+        
+        /// <summary>
+        /// Get {@link Comment} nodes that are direct child nodes of the selected elements.
+        /// </summary>
+        /// <returns>Comment nodes, or an empty list if none.</returns>
+        public List<Comment> Comments() {
+            return ChildNodesOfType<Comment>();
+        }
+        
+        /// <summary>
+        /// Get {@link TextNode} nodes that are direct child nodes of the selected elements.
+        /// </summary>
+        /// <returns>TextNode nodes, or an empty list if none.</returns>
+        public List<TextNode> TextNodes() {
+            return ChildNodesOfType<TextNode>();
+        }
+        
+        /// <summary>
+        /// Get {@link DataNode} nodes that are direct child nodes of the selected elements. DataNode nodes contain the
+        /// content of tags such as {@code script}, {@code style} etc and are distinct from {@link TextNode}s.
+        /// </summary>
+        /// <returns>Comment nodes, or an empty list if none.</returns>
+        public List<DataNode> DataNodes() {
+            return ChildNodesOfType<DataNode>();
+        }
+        
+        private List<T> ChildNodesOfType<T>() where T : Node
+        {
+            List<T> nodes = new List<T>();
+            foreach (Element el in this)
+            {
+                for (int i = 0; i < el.ChildNodes().Count; i++)
+                {
+                    Node node = el.ChildNodes()[i];
+                    if (node is T node1)
+                        nodes.Add(node1);
+                }
+            }
+            return nodes;
+        }
+
 
         // implements List<Element> delegates:
         

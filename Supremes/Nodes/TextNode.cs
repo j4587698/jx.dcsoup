@@ -18,12 +18,10 @@ namespace Supremes.Nodes
         /// Create a new TextNode representing the supplied (unencoded) text).
         /// </summary>
         /// <param name="text">raw text</param>
-        /// <param name="baseUri">base uri</param>
         /// <seealso cref="CreateFromEncoded(string, string)">CreateFromEncoded(string, string)
         /// </seealso>
-        internal TextNode(string text, string baseUri)
+        internal TextNode(string text)
         {
-            this.baseUri = baseUri;
             this.text = text;
         }
 

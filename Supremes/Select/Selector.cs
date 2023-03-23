@@ -2,6 +2,7 @@
 using Supremes.Nodes;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Supremes.Select
 {
@@ -76,21 +77,8 @@ namespace Supremes.Select
     /// </remarks>
     /// <author>Jonathan Hedley, jonathan@hedley.net</author>
     /// <seealso cref="Supremes.Nodes.Element.Select(string)">Supremes.Nodes.Element.Select(string)</seealso>
-    public class Selector
+    public static class Selector
     {
-        private readonly Evaluator evaluator;
-
-        private readonly Element root;
-
-        private Selector(string query, Element root)
-        {
-            Validate.NotNull(query);
-            query = query.Trim();
-            Validate.NotEmpty(query);
-            Validate.NotNull(root);
-            this.evaluator = QueryParser.Parse(query);
-            this.root = root;
-        }
 
         /// <summary>
         /// Find elements matching selector.
@@ -100,7 +88,21 @@ namespace Supremes.Select
         /// <returns>matching elements, empty if not</returns>
         public static Elements Select(string query, Element root)
         {
-            return new Supremes.Select.Selector(query, root).Select();
+            Validate.NotEmpty(query);
+            return Select(QueryParser.Parse(query), root);
+        }
+
+        /// <summary>
+        /// Find elements matching selector.
+        /// </summary>
+        /// <param name="evaluator"></param>
+        /// <param name="root"></param>
+        /// <returns></returns>
+        public static Elements Select(Evaluator evaluator, Element root)
+        {
+            Validate.NotNull(evaluator);
+            Validate.NotNull(root);
+            return Collector.Collect(evaluator, root);
         }
 
         /// <summary>
@@ -113,25 +115,51 @@ namespace Supremes.Select
         {
             Validate.NotEmpty(query);
             Validate.NotNull(roots);
-            LinkedHashSet<Element> elements = new LinkedHashSet<Element>();
-            foreach (Element root in roots)
-            {
-                elements.AddRange(Select(query, root));
-            }
-            return new Elements(elements);
-        }
+            Evaluator evaluator = QueryParser.Parse(query);
+            Elements elements = new Elements();
+            List<Element> seenElements = new List<Element>(); // dedupe elements by identity, not equality
+            // dedupe elements by identity, not equality
 
-        private Elements Select()
+            foreach (Element root in roots) {
+                Elements found = Select(evaluator, root);
+                foreach (Element el in found) {
+                    if (!seenElements.Contains(el)) {
+                        elements.Add(el);
+                        seenElements.Add(el);
+                    }
+                }
+            }
+            return elements;
+        }
+        
+        /// <summary>
+        /// exclude set. package open so that Elements can implement .not() selector.
+        /// </summary>
+        /// <param name="elements"></param>
+        /// <param name="outs"></param>
+        /// <returns></returns>
+        internal static Elements FilterOut(List<Element> elements, List<Element> outs) {
+            Elements output = new Elements();
+            output.AddRange(elements.Where(outs.Contains));
+            return output;
+        }
+        
+        /// <summary>
+        /// Find the first element that matches the query.
+        /// </summary>
+        /// <param name="cssQuery">CSS selector</param>
+        /// <param name="root">root element to descend into</param>
+        /// <returns>the matching element, or <b>null</b> if none.</returns>
+        public static Element SelectFirst(string cssQuery, Element root)
         {
-            return Collector.Collect(evaluator, root);
+            Validate.NotEmpty(cssQuery);
+            return Collector.FindFirst(QueryParser.Parse(cssQuery), root);
         }
 
         /// <summary>
         /// The exception that is thrown when a <see cref="Selector"/> parses an invalid query.
         /// </summary>
-#if (!NETSTANDARD1_3)
         [Serializable]
-#endif
         public class SelectorParseException : InvalidOperationException
         {
             /// <summary>
