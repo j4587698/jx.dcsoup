@@ -11,18 +11,35 @@ namespace Supremes.Parsers
     {
         internal TokenType type;
 
+        internal const int Unset = -1;
+
         internal Token()
         {
         }
 
-        internal string Type()
+        internal string Type => this.GetType().Name;
+
+        internal virtual Token Reset()
         {
-            return this.GetType().Name;
+            StartPos = Unset;
+            EndPos = Unset;
+            return this;
+        }
+
+        internal int StartPos { get; set; }
+
+        internal int EndPos { get; set; }
+
+        internal static void Reset(StringBuilder sb)
+        {
+            sb?.Clear();
         }
 
         internal class Doctype : Token
         {
             internal readonly StringBuilder name = new StringBuilder();
+
+            internal string pubSysKey = null;
 
             internal readonly StringBuilder publicIdentifier = new StringBuilder();
 
@@ -35,9 +52,25 @@ namespace Supremes.Parsers
                 type = TokenType.Doctype;
             }
 
+            internal override Token Reset()
+            {
+                base.Reset();
+                Reset(name);
+                pubSysKey = null;
+                Reset(publicIdentifier);
+                Reset(systemIdentifier);
+                forceQuirks = false;
+                return this;
+            }
+
             internal string GetName()
             {
                 return name.ToString();
+            }
+            
+            internal string GetPubSysKey()
+            {
+                return pubSysKey;
             }
 
             internal string GetPublicIdentifier()
@@ -54,68 +87,120 @@ namespace Supremes.Parsers
             {
                 return forceQuirks;
             }
+
+            public override string ToString()
+            {
+                return "<!doctype " + GetName() + ">";
+            }
         }
 
         internal abstract class Tag : Token
         {
             internal string tagName;
+            internal string normalName;
 
-            private string pendingAttributeName;
+            private readonly StringBuilder attrName = new StringBuilder();
+            private string attrNameS;
+            private bool hasAttrName = false;
 
-            private StringBuilder pendingAttributeValue;
+            private readonly StringBuilder attrValue = new StringBuilder();
+            private string attrValueS;
+            private bool hasAttrValue = false;
+            private bool hasEmptyAttrValue = false;
 
-            internal bool selfClosing = false;
+            public bool selfClosing = false;
+            public Attributes attributes;
 
-            internal Attributes attributes;
-
+            internal override Token Reset()
+            {
+                base.Reset();
+                tagName = null;
+                normalName = null;
+                Reset(attrName);
+                attrNameS = null;
+                hasAttrName = false;
+                Reset(attrValue);
+                attrValueS = null;
+                hasEmptyAttrValue = false;
+                hasAttrValue = false;
+                selfClosing = false;
+                attributes = null;
+                return this;
+            }
+            
+            private const int MaxAttributes = 512;
+            
             // attribute names are generally caught in one hop, not accumulated
             // but values are accumulated, from e.g. & in hrefs
             // start tags get attributes on construction. End tags get attributes on first new attribute (but only for parser convenience, not used).
             internal void NewAttribute()
             {
                 if (attributes == null)
-                {
                     attributes = new Attributes();
-                }
-                if (pendingAttributeName != null)
+
+                if (hasAttrName && attributes.Count < MaxAttributes)
                 {
-                    Attribute attribute;
-                    if (pendingAttributeValue == null)
+                    string name = attrName.Length > 0 ? attrName.ToString() : attrNameS;
+                    name = name.Trim();
+                    if (name.Length > 0)
                     {
-                        attribute = new Attribute(pendingAttributeName, string.Empty);
+                        string value;
+                        if (hasAttrValue)
+                            value = attrValue.Length > 0 ? attrValue.ToString() : attrValueS;
+                        else if (hasEmptyAttrValue)
+                            value = "";
+                        else
+                            value = null;
+                        attributes.Add(name, value);
                     }
-                    else
-                    {
-                        attribute = new Attribute(pendingAttributeName, pendingAttributeValue.ToString());
-                    }
-                    attributes.Put(attribute);
                 }
-                pendingAttributeName = null;
-                if (pendingAttributeValue != null)
-                {
-                    pendingAttributeValue.Remove(0, pendingAttributeValue.Length);
-                }
+                Reset(attrName);
+                attrNameS = null;
+                hasAttrName = false;
+
+                Reset(attrValue);
+                attrValueS = null;
+                hasAttrValue = false;
+                hasEmptyAttrValue = false;
+            }
+            
+            public bool HasAttributes()
+            {
+                return attributes != null;
+            }
+            
+            public bool HasAttribute(string key)
+            {
+                return attributes != null && attributes.ContainsKey(key);
             }
 
             internal void FinaliseTag()
             {
-                // finalises for emit
-                if (pendingAttributeName != null)
+                if (hasAttrName)
                 {
-                    // todo: check if attribute name exists; if so, drop and error
                     NewAttribute();
                 }
             }
 
             internal string Name()
             {
-                Validate.IsFalse(tagName == null || tagName.Length == 0);
+                Validate.IsFalse(string.IsNullOrEmpty(tagName));
                 return tagName;
             }
 
+            internal string NormalName()
+            {
+                return normalName!;
+            }
+            
+            internal string ToStringName() {
+                return tagName ?? "[unset]";
+            }
+            
             internal Token.Tag Name(string name)
             {
                 tagName = name;
+                normalName = ParseSettings.NormalName(tagName);
                 return this;
             }
 
@@ -132,7 +217,10 @@ namespace Supremes.Parsers
             // these appenders are rarely hit in not null state-- caused by null chars.
             internal void AppendTagName(string append)
             {
-                tagName = tagName == null ? append : tagName + append;
+                // might have null chars - need to replace with null replacement character
+                append = append.Replace(TokeniserState.nullChar, Tokeniser.replacementChar);
+                tagName = tagName == null ? append : string.Concat(tagName, append);
+                normalName = ParseSettings.NormalName(tagName);
             }
 
             internal void AppendTagName(char append)
@@ -142,37 +230,71 @@ namespace Supremes.Parsers
 
             internal void AppendAttributeName(string append)
             {
-                pendingAttributeName = pendingAttributeName == null ? append : pendingAttributeName + append;
+                // might have null chars because we eat in one pass - need to replace with null replacement character
+                append = append.Replace(TokeniserState.nullChar, Tokeniser.replacementChar);
+
+                EnsureAttrName();
+                if (attrName.Length == 0) {
+                    attrNameS = append;
+                } else {
+                    attrName.Append(append);
+                }
             }
 
             internal void AppendAttributeName(char append)
             {
-                AppendAttributeName(append.ToString());
+                EnsureAttrName();
+                attrName.Append(append);
             }
 
             internal void AppendAttributeValue(string append)
             {
-                EnsureAttributeValue();
-                pendingAttributeValue.Append(append);
+                EnsureAttrValue();
+                if (attrValue.Length == 0) {
+                    attrValueS = append;
+                } else {
+                    attrValue.Append(append);
+                }
             }
 
             internal void AppendAttributeValue(char append)
             {
-                EnsureAttributeValue();
-                pendingAttributeValue.Append(append);
+                EnsureAttrValue();
+                attrValue.Append(append);
             }
 
             internal void AppendAttributeValue(char[] append)
             {
-                EnsureAttributeValue();
-                pendingAttributeValue.Append(append);
+                EnsureAttrValue();
+                attrValue.Append(append);
             }
-
-            private void EnsureAttributeValue()
-            {
-                if (pendingAttributeValue == null)
-                {
-                    pendingAttributeValue = new StringBuilder();
+            
+            public void AppendAttributeValue(int[] appendCodepoints) {
+                EnsureAttrValue();
+                foreach (int codepoint in appendCodepoints) {
+                    attrValue.Append(char.ConvertFromUtf32(codepoint));
+                }
+            }
+            
+            internal void SetEmptyAttributeValue() {
+                hasEmptyAttrValue = true;
+            }
+            
+            private void EnsureAttrName() {
+                hasAttrName = true;
+                // if on second hit, we'll need to move to the builder
+                if (attrNameS != null) {
+                    attrName.Append(attrNameS);
+                    attrNameS = null;
+                }
+            }
+            
+            private void EnsureAttrValue() {
+                hasAttrValue = true;
+                // if on second hit, we'll need to move to the builder
+                if (attrValueS != null) {
+                    attrValue.Append(attrValueS);
+                    attrValueS = null;
                 }
             }
         }

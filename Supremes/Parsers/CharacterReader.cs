@@ -48,6 +48,10 @@ namespace Supremes.Parsers
             BufferUp();
         }
         
+        public CharacterReader(StringReader input): this(input, maxBufferLen)
+        {
+        }
+        
         /// <summary>
         /// 
         /// </summary>
