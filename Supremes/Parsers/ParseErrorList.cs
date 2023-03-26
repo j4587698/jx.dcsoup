@@ -8,14 +8,13 @@ namespace Supremes.Parsers
     /// A container for ParseErrors.
     /// </summary>
     /// <author>Jonathan Hedley</author>
-#if (!NETSTANDARD2_0_OR_GREATER)
-    [Serializable]
-#endif
     public class ParseErrorList : List<ParseError>
     {
         private const long serialVersionUID = 1L;
 
         private const int INITIAL_CAPACITY = 16;
+        
+        private readonly int initialCapacity;
 
         private readonly int maxSize;
 
@@ -23,6 +22,11 @@ namespace Supremes.Parsers
         	: base(initialCapacity)
         {
             this.maxSize = maxSize;
+            this.initialCapacity = initialCapacity;
+        }
+        
+        internal ParseErrorList(ParseErrorList copy): this(copy.initialCapacity, copy.maxSize)
+        {
         }
 
         internal bool CanAddError => Count < maxSize;

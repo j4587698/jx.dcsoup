@@ -93,6 +93,19 @@ namespace Supremes
         }
 
         /// <summary>
+        /// Parse HTML into a Document, using the provided Parser. You can provide an alternate parser, such as a simple XML
+        /// (non-HTML) parser.  As no base URI is specified, absolute URL resolution, if required, relies on the HTML including
+        /// a {@code <base href>} tag.
+        /// </summary>
+        /// <param name="html">HTML to parse</param>
+        /// <param name="parser">alternate {@link Parser#xmlParser() parser} to use.</param>
+        /// <returns>sane HTML</returns>
+        public static Document Parse(string html, Parser parser)
+        {
+            return parser.ParseInput(html, string.Empty);
+        }
+
+        /// <summary>
         /// Parse the contents of a file as HTML.
         /// </summary>
         /// <param name="in">file to load HTML from</param>

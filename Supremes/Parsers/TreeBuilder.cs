@@ -49,7 +49,7 @@ namespace Supremes.Parsers
             settings = parser.Settings;
             reader = new CharacterReader(input);
             this.parser = parser;
-            trackSourceRange = parser.IsTrackPosition;
+            trackSourceRange = parser.TrackPosition;
             reader.TrackNewlines(parser.IsTrackErrors || trackSourceRange);
             tokeniser = new Tokeniser(reader, parser.Errors);
             stack = new List<Element>(32);
@@ -71,7 +71,7 @@ namespace Supremes.Parsers
         
         internal abstract TreeBuilder NewInstance { get; }
 
-        internal abstract IReadOnlyList<Node> ParseFragment(string inputFragment, Element context, string baseUri, Parser parser);
+        internal abstract List<Node> ParseFragment(string inputFragment, Element context, string baseUri, Parser parser);
         
         internal void RunParser()
         {
@@ -95,7 +95,7 @@ namespace Supremes.Parsers
             if (currentToken == start) { // don't recycle an in-use token
                 return Process(new Token.StartTag().Name(name));
             }
-            return Process(start.Reset().Name(name));
+            return Process(((Token.Tag)start.Reset()).Name(name));
         }
 
         /// <summary>
@@ -125,7 +125,7 @@ namespace Supremes.Parsers
             {
                 return Process(new Token.EndTag().Name(name));
             }
-            return Process(end.Reset().Name(name));
+            return Process(((Token.EndTag)end.Reset()).Name(name));
         }
 
         /// <summary>
@@ -150,17 +150,7 @@ namespace Supremes.Parsers
             Element current = CurrentElement();
             return current != null && current.NormalName.Equals(normalName);
         }
-
-        /// <summary>
-        /// If the parser is tracking errors, add an error at the current position.
-        /// </summary>
-        /// <param name="msg">error message template</param>
-        /// <param name="args">template arguments</param>
-        internal void Error(string msg, params object[] args) {
-            ParseErrorList errors = parser.Errors;
-            if (errors.CanAddError)
-                errors.Add(new ParseError(reader, msg, args));
-        }
+        
         
         /// <summary>
         /// (An internal method, visible for Element. For HTML parse, signals that script and style text should be treated as

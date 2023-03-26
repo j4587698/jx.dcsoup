@@ -217,9 +217,15 @@ namespace Supremes.Nodes
     /// <author>Jonathan Hedley, jonathan@hedley.net</author>
     public sealed class Document : Element
     {
+        private IConnection connection;
+        
         private DocumentOutputSettings outputSettings = new DocumentOutputSettings();
 
-        private string location;
+        private Parser parser;
+        
+        private DocumentQuirksMode quirksMode = DocumentQuirksMode.NoQuirks;
+
+        private bool updateMetaCharset = false;
 
         /// <summary>
         /// Create a new, empty Document.
@@ -227,9 +233,10 @@ namespace Supremes.Nodes
         /// <param name="baseUri">base URI of document</param>
         /// <seealso cref="Supremes.Dcsoup.Parse(string)">Supremes.Dcsoup.Parse(string)</seealso>
         /// <seealso cref="CreateShell(string)">CreateShell(string)</seealso>
-        internal Document(string baseUri) : base(Supremes.Nodes.Tag.ValueOf("#root"), baseUri)
+        internal Document(string baseUri) : base(Supremes.Nodes.Tag.ValueOf("#root", ParseSettings.HtmlDefault), baseUri)
         {
-            this.location = baseUri;
+            this.Location = baseUri;
+            this.parser = Parser.HtmlParser;
         }
 
         /// <summary>
@@ -240,7 +247,7 @@ namespace Supremes.Nodes
         public static Document CreateShell(string baseUri)
         {
             Validate.NotNull(baseUri);
-            Document doc = new Supremes.Nodes.Document(baseUri);
+            Document doc = new Document(baseUri);
             Element html = doc.AppendElement("html");
             html.AppendElement("head");
             html.AppendElement("body");
@@ -255,11 +262,16 @@ namespace Supremes.Nodes
         /// this will return the final URL from which the document was served from.
         /// </remarks>
         /// <returns>location</returns>
-        public string Location
-        {
-            get { return location; }
-        }
+        public string Location { get; }
 
+        public IConnection Connection()
+        {
+            if (connection == null)
+            {
+                return Dcsoup.NewSession();
+            }
+        }
+        
         /// <summary>
         /// Accessor to the document's
         /// <c>head</c>

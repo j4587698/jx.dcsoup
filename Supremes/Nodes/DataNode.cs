@@ -9,22 +9,19 @@ namespace Supremes.Nodes
     /// <author>Jonathan Hedley, jonathan@hedley.net</author>
     public sealed class DataNode : LeafNode
     {
-        private const string DATA_KEY = "data";
-
         /// <summary>
         /// Create a new DataNode.
         /// </summary>
         /// <param name="data">data contents</param>
-        /// <param name="baseUri">base URI</param>
-        internal DataNode(string data, string baseUri) : base(baseUri)
+        public DataNode(string data)
         {
-            attributes[DATA_KEY] = data;
+            value = data;
         }
 
-        internal override string NodeName
-        {
-        	get { return "#data"; }
-        }
+        /// <summary>
+        /// 
+        /// </summary>
+        public override string NodeName => "#data";
 
         /// <summary>
         /// Get or Set the data contents of this node.
@@ -37,14 +34,8 @@ namespace Supremes.Nodes
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
         public string WholeData
         {
-            set
-            {
-                attributes[DATA_KEY] = value;
-            }
-            get
-            {
-                return attributes[DATA_KEY];
-            }
+            set => CoreValue = value;
+            get => CoreValue;
         }
 
         internal override void AppendOuterHtmlHeadTo(StringBuilder accum, int depth, DocumentOutputSettings @out)
@@ -64,18 +55,6 @@ namespace Supremes.Nodes
         public override string ToString()
         {
             return OuterHtml;
-        }
-
-        /// <summary>
-        /// Create a new DataNode from HTML encoded data.
-        /// </summary>
-        /// <param name="encodedData">encoded data</param>
-        /// <param name="baseUri">base URI</param>
-        /// <returns>new DataNode</returns>
-        internal static DataNode CreateFromEncoded(string encodedData, string baseUri)
-        {
-            string data = Entities.Unescape(encodedData);
-            return new Supremes.Nodes.DataNode(data, baseUri);
         }
     }
 }

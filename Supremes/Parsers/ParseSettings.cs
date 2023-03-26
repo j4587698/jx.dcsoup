@@ -41,7 +41,7 @@ public class ParseSettings
         _preserveAttributeCase = attribute;
     }
 
-    private ParseSettings(ParseSettings copy)
+    internal ParseSettings(ParseSettings copy)
     {
         _preserveTagCase = copy._preserveTagCase;
         _preserveAttributeCase = copy._preserveAttributeCase;
@@ -69,6 +69,11 @@ public class ParseSettings
         return name;
     }
 
+    /// <summary>
+    /// Normalizes an attribute according to the case preservation setting.
+    /// </summary>
+    /// <param name="attributes"></param>
+    /// <returns></returns>
     public Attributes NormalizeAttributes(Attributes attributes)
     {
         if (attributes != null && !_preserveAttributeCase)

@@ -303,30 +303,33 @@ namespace Supremes.Parsers
         {
             public StartTag() : base()
             {
-                attributes = new Attributes();
                 type = TokenType.StartTag;
             }
 
-            internal StartTag(string name) : this()
+            internal override Token Reset()
             {
-                this.tagName = name;
+                base.Reset();
+                attributes = null;
+                return this;
             }
-
-            internal StartTag(string name, Attributes attributes) : this()
-            {
+            
+            internal StartTag NameAttr(string name, Attributes attributes) {
                 this.tagName = name;
                 this.attributes = attributes;
+                normalName = ParseSettings.NormalName(tagName);
+                return this;
             }
+
 
             public override string ToString()
             {
-                if (attributes != null && attributes.Count > 0)
+                if (HasAttributes() && attributes.Count > 0)
                 {
-                    return "<" + Name() + " " + attributes.ToString() + ">";
+                    return $"<{ToStringName()} {attributes}>";
                 }
                 else
                 {
-                    return "<" + Name() + ">";
+                    return $"<{ToStringName()}>";
                 }
             }
         }
@@ -338,20 +341,17 @@ namespace Supremes.Parsers
                 type = TokenType.EndTag;
             }
 
-            internal EndTag(string name) : this()
-            {
-                this.tagName = name;
-            }
-
             public override string ToString()
             {
-                return "</" + Name() + ">";
+                return $"</{ToStringName()}>";
             }
         }
 
         internal class Comment : Token
         {
             internal readonly StringBuilder data = new StringBuilder();
+            
+            private string dataS; // try to get in one shot
 
             internal bool bogus = false;
 
@@ -360,35 +360,88 @@ namespace Supremes.Parsers
                 type = TokenType.Comment;
             }
 
+            internal override Token Reset()
+            {
+                base.Reset();
+                Reset(data);
+                dataS = null;
+                bogus = false;
+                return this;
+            }
+
             internal string GetData()
             {
-                return data.ToString();
+                return dataS ?? data.ToString();
+            }
+
+            internal Comment Append(string append)
+            {
+                EnsureData();
+                if (data.Length == 0)
+                {
+                    dataS = append;
+                }
+                else
+                {
+                    data.Append(append);
+                }
+
+                return this;
+            }
+
+            internal Comment Append(char append)
+            {
+                EnsureData();
+                data.Append(append);
+                return this;
+            }
+            
+            private void EnsureData() {
+                // if on second hit, we'll need to move to the builder
+                if (dataS != null) {
+                    data.Append(dataS);
+                    dataS = null;
+                }
             }
 
             public override string ToString()
             {
-                return "<!--" + GetData() + "-->";
+                return $"<!--{GetData()}-->";
             }
         }
 
         internal class Character : Token
         {
-            private readonly string data;
-
-            internal Character(string data)
+            internal Character()
             {
                 type = TokenType.Character;
-                this.data = data;
             }
 
-            internal string GetData()
+            internal override Token Reset()
             {
-                return data;
+                base.Reset();
+                Data = null;
+                return this;
+            }
+
+            internal string Data { get; set; }
+
+            public override string ToString()
+            {
+                return Data;
+            }
+        }
+        
+        internal class CData : Character
+        {
+            internal CData(string data) : base()
+            {
+                Data = data;
             }
 
             public override string ToString()
             {
-                return GetData();
+                return $"<![CDATA[{Data}]]>";
             }
         }
 
@@ -397,6 +450,11 @@ namespace Supremes.Parsers
             public EOF()
             {
                 type = TokenType.EOF;
+            }
+
+            public override string ToString()
+            {
+                return "";
             }
         }
 
@@ -448,6 +506,11 @@ namespace Supremes.Parsers
         internal Token.Character AsCharacter()
         {
             return (Token.Character)this;
+        }
+        
+        internal bool IsCData()
+        {
+            return this is CData;
         }
 
         internal bool IsEOF()

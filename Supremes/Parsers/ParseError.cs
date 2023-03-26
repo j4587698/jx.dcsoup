@@ -7,39 +7,50 @@ namespace Supremes.Parsers
     /// </summary>
     public sealed class ParseError
     {
-        private readonly int pos;
-
-        private readonly string errorMsg;
+        internal ParseError(CharacterReader reader, string errorMsg)
+        {
+            Position = reader.Pos();
+            CursorPos = reader.CursorPos();
+            this.ErrorMessage = errorMsg;
+        }
+        
+        internal ParseError(CharacterReader reader, string errorFormat, params object[] args)
+        {
+            Position = reader.Pos();
+            CursorPos = reader.CursorPos();
+            ErrorMessage = string.Format(errorFormat, args);
+        }
 
         internal ParseError(int pos, string errorMsg)
         {
-            this.pos = pos;
-            this.errorMsg = errorMsg;
+            this.Position = pos;
+            CursorPos = pos.ToString();
+            this.ErrorMessage = errorMsg;
         }
 
         internal ParseError(int pos, string errorFormat, params object[] args)
         {
-            this.errorMsg = string.Format(errorFormat, args);
-            this.pos = pos;
+            this.ErrorMessage = string.Format(errorFormat, args);
+            CursorPos = pos.ToString();
+            this.Position = pos;
         }
 
         /// <summary>
         /// Retrieve the error message.
         /// </summary>
         /// <returns>the error message.</returns>
-        public string ErrorMessage
-        {
-            get { return errorMsg; }
-        }
+        public string ErrorMessage { get; }
 
         /// <summary>
         /// Retrieves the offset of the error.
         /// </summary>
         /// <returns>error offset within input</returns>
-        public int Position
-        {
-            get { return pos; }
-        }
+        public int Position { get; }
+
+        /// <summary>
+        ///  Get the formatted line:column cursor position where the error occurred.
+        /// </summary>
+        public string CursorPos { get; }
 
         /// <summary>
         /// Converts the value of this instance to a string.
@@ -47,7 +58,7 @@ namespace Supremes.Parsers
         /// <returns></returns>
         public override string ToString()
         {
-            return pos + ": " + errorMsg;
+            return $"<{CursorPos}>: {ErrorMessage}";
         }
     }
 }

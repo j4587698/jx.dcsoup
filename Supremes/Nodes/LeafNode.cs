@@ -7,114 +7,107 @@ public abstract class LeafNode : Node
 {
     internal Object value; // either a string value, or an attribute map (in the rare case multiple attributes are set)
 
-        protected bool HasAttributes()
-        {
-            return value is Attributes;
-        }
+    protected override bool HasAttributes => value is Attributes;
 
-        public override Attributes Attributes()
+    public override Attributes Attributes
+    {
+        get
         {
             EnsureAttributes();
             return (Attributes)value;
         }
 
-        private void EnsureAttributes()
+    }
+
+    private void EnsureAttributes()
+    {
+        if (!HasAttributes)
         {
-            if (!HasAttributes())
-            {
-                Object coreValue = value;
-                Attributes attributes = new Attributes();
-                value = attributes;
-                if (coreValue != null)
-                    attributes.Put(NodeName, (String)coreValue);
-            }
+            Object coreValue = value;
+            Attributes attributes = new Attributes();
+            value = attributes;
+            if (coreValue != null)
+                attributes.Put(NodeName, (String)coreValue);
+        }
+    }
+
+    internal string CoreValue
+    {
+        get => Attr(NodeName);
+        set => Attr(NodeName, value);
+    }
+
+
+    public override string Attr(string key)
+    {
+        if (!HasAttributes)
+        {
+            return NodeName.Equals(key) ? (string)value : string.Empty;
         }
 
-        String CoreValue()
-        {
-            return Attr(NodeName);
-        }
+        return base.Attr(key);
+    }
 
-        void CoreValue(String value)
+    public override Node Attr(string key, string value)
+    {
+        if (!HasAttributes && key.Equals(NodeName))
         {
-            Attr(NodeName, value);
+            this.value = value;
         }
-
-        public override String Attr(String key)
-        {
-            if (!HasAttributes())
-            {
-                return NodeName.Equals(key) ? (String)value : String.Empty;
-            }
-            return base.Attr(key);
-        }
-
-        public override Node Attr(String key, String value)
-        {
-            if (!HasAttributes() && key.Equals(NodeName))
-            {
-                this.value = value;
-            }
-            else
-            {
-                EnsureAttributes();
-                base.Attr(key, value);
-            }
-            return this;
-        }
-
-        public override bool HasAttr(String key)
+        else
         {
             EnsureAttributes();
-            return base.HasAttr(key);
+            base.Attr(key, value);
         }
 
-        public override Node RemoveAttr(String key)
-        {
-            EnsureAttributes();
-            return base.RemoveAttr(key);
-        }
+        return this;
+    }
 
-        public override String AbsUrl(String key)
-        {
-            EnsureAttributes();
-            return base.AbsUrl(key);
-        }
+    public override bool HasAttr(string key)
+    {
+        EnsureAttributes();
+        return base.HasAttr(key);
+    }
 
-        public override String BaseUri()
-        {
-            return HasParent() ? parent().baseUri() : "";
-        }
+    public override Node RemoveAttr(string key)
+    {
+        EnsureAttributes();
+        return base.RemoveAttr(key);
+    }
 
-        protected override void DoSetBaseUri(String baseUri)
-        {
-            // noop
-        }
+    public override string AbsUrl(string key)
+    {
+        EnsureAttributes();
+        return base.AbsUrl(key);
+    }
 
-        public override int ChildNodeSize()
-        {
-            return 0;
-        }
+    public override string BaseUri => HasParent ? Parent.BaseUri : "";
 
-        public override Node Empty()
-        {
-            return this;
-        }
+    protected override void DoSetBaseUri(string baseUri)
+    {
+        // noop
+    }
 
-        protected override List<Node> EnsureChildNodes()
-        {
-            return EmptyNodes;
-        }
+    public override int ChildNodeSize => 0;
 
-        protected LeafNode DoClone(Node parent)
-        {
-            LeafNode clone = (LeafNode)base.DoClone(parent);
+    public override Node Empty()
+    {
+        return this;
+    }
 
-            // Object value could be plain string or attributes - need to clone
-            if (HasAttributes())
-                clone.value = ((Attributes)value).Clone();
+    protected override List<Node> EnsureChildNodes()
+    {
+        return EmptyNodes;
+    }
 
-            return clone;
-        }
+    protected LeafNode DoClone(Node parent)
+    {
+        LeafNode clone = (LeafNode)base.DoClone(parent);
+
+        // Object value could be plain string or attributes - need to clone
+        if (HasAttributes)
+            clone.value = ((Attributes)value).Clone();
+
+        return clone;
     }
 }

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Supremes.Helper;
 
 namespace Supremes.Parsers
 {
@@ -15,11 +16,7 @@ namespace Supremes.Parsers
     /// </summary>
     public class Parser
     {
-        private TreeBuilder treeBuilder;
-
         private ParseErrorList errors;
-
-        private bool trackPosition = false;
 
         /// <summary>
         /// Create a new Parser, using the specified TreeBuilder
@@ -28,7 +25,7 @@ namespace Supremes.Parsers
         public Parser(TreeBuilder treeBuilder)
         {
             // by default, error tracking is disabled.
-            this.treeBuilder = treeBuilder;
+            this.TreeBuilder = treeBuilder;
             Settings = treeBuilder.DefaultSettings;
             errors = ParseErrorList.NoTracking();
         }
@@ -37,16 +34,14 @@ namespace Supremes.Parsers
         /// Creates a new Parser as a deep copy of this; including initializing a new TreeBuilder. Allows independent (multi-threaded) use.
         /// </summary>
         /// <returns>a copied parser</returns>
-        public Parser NewInstance()
+        public Parser NewInstance =>  new Parser(this);
+
+        private Parser(Parser copy)
         {
-            return new Parser(this);
-        }
-        
-        private Parser(Parser copy) {
-            treeBuilder = copy.treeBuilder.NewInstance(); // because extended
+            TreeBuilder = copy.TreeBuilder.NewInstance; // because extended
             errors = new ParseErrorList(copy.errors); // only copies size, not contents
             Settings = new ParseSettings(copy.Settings);
-            trackPosition = copy.trackPosition;
+            TrackPosition = copy.TrackPosition;
         }
 
         /// <summary>
@@ -57,13 +52,12 @@ namespace Supremes.Parsers
         /// <returns></returns>
         public Document ParseInput(string html, string baseUri)
         {
-            errors = CanTrackErrors ? ParseErrorList.Tracking(maxErrors) : ParseErrorList.NoTracking();
-            Document doc = treeBuilder.Parse(html, baseUri, errors);
+            Document doc = TreeBuilder.Parse(new StringReader(html), baseUri, this);
             return doc;
         }
         
         public List<Node> ParseFragmentInput(String fragment, Element context, String baseUri) {
-            return treeBuilder.ParseFragment(fragment, context, baseUri, this);
+            return TreeBuilder.ParseFragment(fragment, context, baseUri, this);
         }
 
         // gets & sets
@@ -72,24 +66,14 @@ namespace Supremes.Parsers
         /// Get the TreeBuilder currently in use.
         /// </summary>
         /// <returns>current TreeBuilder.</returns>
-        internal TreeBuilder TreeBuilder => treeBuilder;
+        internal TreeBuilder TreeBuilder { get; set; }
 
-        /// <summary>
-        /// Update the TreeBuilder used when parsing content.
-        /// </summary>
-        /// <param name="treeBuilder">current TreeBuilder</param>
-        /// <returns>this, for chaining</returns>
-        internal Parser SetTreeBuilder(TreeBuilder treeBuilder)
-        {
-            this.treeBuilder = treeBuilder;
-            return this;
-        }
 
         /// <summary>
         /// Check if parse error tracking is enabled.
         /// </summary>
         /// <returns>current track error state.</returns>
-        public bool CanTrackErrors => maxErrors > 0;
+        public bool CanTrackErrors => errors.MaxSize > 0;
 
         /// <summary>
         /// Enable or disable parse error tracking for the next parse.
@@ -141,17 +125,22 @@ namespace Supremes.Parsers
         /// Enable or disable source position tracking. If enabled, Nodes will have a Position to track where in the original
         /// input source they were created from.
         /// </summary>
-        public bool IsTrackPosition
-        {
-            get => trackPosition;
-            set => trackPosition = value;
-        }
-        
+        public bool TrackPosition { get; set; } = false;
+
         /// <summary>
         /// Get / Set the ParseSettings of this Parser, to control the case sensitivity of tags and attributes.
         /// </summary>
         public ParseSettings Settings { get; set; }
 
+        /// <summary>
+        /// (An internal method, visible for Element. For HTML parse, signals that script and style text should be treated as
+        /// Data Nodes).
+        /// </summary>
+        /// <param name="normalName"></param>
+        /// <returns></returns>
+        public bool IsContentForTagData(String normalName) {
+            return TreeBuilder.IsContentForTagData(normalName);
+        }
         
         // utility methods
         
@@ -164,7 +153,7 @@ namespace Supremes.Parsers
         public static Document Parse(string html, string baseUri)
         {
             TreeBuilder treeBuilder = new HtmlTreeBuilder();
-            return treeBuilder.Parse(html, baseUri, ParseErrorList.NoTracking());
+            return treeBuilder.Parse(new StringReader(html), baseUri, new Parser(treeBuilder));
         }
 
         /// <summary>
@@ -184,10 +173,26 @@ namespace Supremes.Parsers
         /// <returns>
         /// list of nodes parsed from the input HTML. Note that the context element, if supplied, is not modified.
         /// </returns>
-        public static IReadOnlyList<Node> ParseFragment(string fragmentHtml, Element context, string baseUri)
+        public static List<Node> ParseFragment(string fragmentHtml, Element context, string baseUri)
         {
             HtmlTreeBuilder treeBuilder = new HtmlTreeBuilder();
-            return treeBuilder.ParseFragment(fragmentHtml, context, baseUri, ParseErrorList.NoTracking());
+            return treeBuilder.ParseFragment(fragmentHtml, context, baseUri, new Parser(treeBuilder));
+        }
+        
+        /// <summary>
+        /// Parse a fragment of HTML into a list of nodes. The context element, if supplied, supplies parsing context.
+        /// </summary>
+        /// <param name="fragmentHtml">the fragment of HTML to parse</param>
+        /// <param name="context">(optional) the element that this HTML fragment is being parsed for (i.e. for inner HTML). This provides stack context (for implicit element creation).</param>
+        /// <param name="baseUri">base URI of document (i.e. original fetch location), for resolving relative URLs.</param>
+        /// <param name="errorList">list to add errors to</param>
+        /// <returns>list of nodes parsed from the input HTML. Note that the context element, if supplied, is not modified.</returns>
+        public static IReadOnlyList<Node> ParseFragment(string fragmentHtml, Element context, string baseUri, ParseErrorList errorList)
+        {
+            HtmlTreeBuilder treeBuilder = new HtmlTreeBuilder();
+            Parser parser = new Parser(treeBuilder);
+            parser.errors = errorList;
+            return treeBuilder.ParseFragment(fragmentHtml, context, baseUri, parser);
         }
 
         /// <summary>
@@ -199,7 +204,7 @@ namespace Supremes.Parsers
         public static IReadOnlyList<Node> ParseXmlFragment(string fragmentXml, string baseUri)
         {
             XmlTreeBuilder treeBuilder = new XmlTreeBuilder();
-            return treeBuilder.ParseFragment(fragmentXml, baseUri, ParseErrorList.NoTracking());
+            return treeBuilder.ParseFragment(fragmentXml, baseUri, new Parser(treeBuilder));
         }
 
         /// <summary>
@@ -214,9 +219,12 @@ namespace Supremes.Parsers
         {
             Document doc = Document.CreateShell(baseUri);
             Element body = doc.Body;
-            IReadOnlyList<Node> nodeList = ParseFragment(bodyHtml, body, baseUri);
+            List<Node> nodeList = ParseFragment(bodyHtml, body, baseUri);
             Node[] nodes = nodeList.ToArray();
             // the node list gets modified when re-parented
+            for (int i = nodes.Length - 1; i > 0; i--) {
+                nodes[i].Remove();
+            }
             foreach (Node node in nodes)
             {
                 body.AppendChild(node);
@@ -235,14 +243,5 @@ namespace Supremes.Parsers
             Tokeniser tokeniser = new Tokeniser(new CharacterReader(@string), ParseErrorList.NoTracking());
             return tokeniser.UnescapeEntities(inAttribute);
         }
-
-//        /// <param name="bodyHtml">HTML to parse</param>
-//        /// <param name="baseUri">baseUri base URI of document (i.e. original fetch location), for resolving relative URLs.</param>
-//        /// <returns>parsed Document</returns>
-//        [Obsolete(@"Use ParseBodyFragment(string, string) or ParseFragment(string, Supremes.Nodes.Element, string) instead.")]
-//        public static Document ParseBodyFragmentRelaxed(string bodyHtml, string baseUri)
-//        {
-//            return Parse(bodyHtml, baseUri);
-//        }
     }
 }

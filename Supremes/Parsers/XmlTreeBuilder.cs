@@ -173,7 +173,7 @@ namespace Supremes.Parsers
             }
         }
 
-        internal IReadOnlyList<Node> ParseFragment(string inputFragment, string baseUri, ParseErrorList errors)
+        internal IReadOnlyList<Node> ParseFragment(string inputFragment, string baseUri, Parser parser)
         {
             InitialiseParse(inputFragment, baseUri, errors);
             RunParser();
