@@ -1,6 +1,7 @@
 ﻿using Supremes.Helper;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using Supremes.Parsers;
@@ -226,8 +227,6 @@ namespace Supremes.Nodes
         
         private DocumentQuirksMode quirksMode = DocumentQuirksMode.NoQuirks;
 
-        private bool updateMetaCharset = false;
-
         /// <summary>
         /// Create a new, empty Document.
         /// </summary>
@@ -441,19 +440,8 @@ namespace Supremes.Nodes
         /// <returns>this document after normalisation</returns>
         internal Document Normalise()
         {
-            Element htmlEl = FindFirstElementByTagName("html", this);
-            if (htmlEl == null)
-            {
-                htmlEl = AppendElement("html");
-            }
-            if (Head == null)
-            {
-                htmlEl.PrependElement("head");
-            }
-            if (Body == null)
-            {
-                htmlEl.AppendElement("body");
-            }
+            Element htmlEl = HtmlEl;
+            _ = Body;
             // pull text nodes out of root, html, and head els, and push into body. non-text nodes are already taken care
             // of. do in inverse order to maintain text order.
             NormaliseTextNodes(Head);
@@ -461,6 +449,8 @@ namespace Supremes.Nodes
             NormaliseTextNodes(this);
             NormaliseStructure("head", htmlEl);
             NormaliseStructure("body", htmlEl);
+
+            EnsureMetaCharsetElement();
             return this;
         }
 
@@ -477,7 +467,7 @@ namespace Supremes.Nodes
             {
                 Node node_1 = toMove[i];
                 element.RemoveChild(node_1);
-                Body.PrependChild(new TextNode(" ", string.Empty));
+                Body.PrependChild(new TextNode(" "));
                 Body.PrependChild(node_1);
             }
         }
@@ -496,10 +486,7 @@ namespace Supremes.Nodes
                 for (int i = 1; i < elements.Count; i++)
                 {
                     Node dupe = elements[i];
-                    foreach (Node node in dupe.ChildNodes())
-                    {
-                        toMove.Add(node);
-                    }
+                    toMove.AddRange(dupe.EnsureChildNodes());
                     dupe.Remove();
                 }
                 foreach (Node dupe_1 in toMove)
@@ -508,7 +495,7 @@ namespace Supremes.Nodes
                 }
             }
             // ensure parented by <html>
-            if (!master.Parent.Equals(htmlEl))
+            if (master.Parent != null && !master.Parent.Equals(htmlEl))
             {
                 htmlEl.AppendChild(master);
             }
@@ -541,10 +528,7 @@ namespace Supremes.Nodes
         /// Get the outer HTML of this document.
         /// </summary>
         /// <returns></returns>
-        public sealed override string OuterHtml
-        {
-            get { return base.Html; } // no outer wrapper tag
-        }
+        public override string OuterHtml => base.Html; // no outer wrapper tag
 
         /// <summary>
         /// Get or Set the combined text of this element and all its children.
@@ -569,16 +553,53 @@ namespace Supremes.Nodes
         /// <seealso cref="Supremes.Fluent.FluentUtility">Supremes.Fluent.FluentUtility</seealso>
         public override string Text
         {
-            get { return base.Text; }
-            set { Body.Text = value; } // overridden to not nuke doc structure
+            get => base.Text;
+            set => Body.Text = value; // overridden to not nuke doc structure
         }
 
-        internal override string NodeName
+        public override string NodeName => "#document";
+
+        /// <summary>
+        /// Sets the charset used in this document. This method is equivalent
+        /// to {@link OutputSettings#charset(java.nio.charset.Charset)
+        ///   * OutputSettings.charset(Charset)} but in addition it updates the
+        /// charset / encoding element within the document.
+        /// 
+        /// <p>This enables
+        /// {@link #updateMetaCharsetElement(boolean) meta charset update}.</p>
+        /// 
+        ///   * <p>If there's no element with charset / encoding information yet it will
+        /// be created. Obsolete charset / encoding definitions are removed!</p>
+        /// 
+        ///   * <p><b>Elements used:</b></p>
+        /// 
+        ///   * <ul>
+        /// <li><b>Html:</b> <i>&lt;meta charset="CHARSET"&gt;</i></li>
+        /// <li><b>Xml:</b> <i>&lt;?xml version="1.0" encoding="CHARSET"&gt;</i></li>
+        /// </ul>
+        /// </summary>
+        public Encoding Charset
         {
-        	get { return "#document"; }
+            get => outputSettings.Charset;
+            set
+            {
+                UpdateMetaCharsetElement = true;
+                outputSettings.Charset = value;
+                EnsureMetaCharsetElement();
+            }
         }
 
-        internal override sealed Node Clone()
+        /// <summary>
+        /// Sets whether the element with charset information in this document is
+        ///   updated on changes through {@link #charset(java.nio.charset.Charset)
+        ///       Document.charset(Charset)} or not.
+        /// 
+        /// <p>If set to <tt>false</tt> <i>(default)</i> there are no elements
+        /// modified.</p>
+        /// </summary>
+        public bool UpdateMetaCharsetElement { get; set; } = false;
+
+        public override Node Clone()
         {
             return PrivateClone();
         }
@@ -588,6 +609,53 @@ namespace Supremes.Nodes
             Document clone = (Document)base.Clone();
             clone.outputSettings = this.outputSettings.Clone();
             return clone;
+        }
+
+        public override Node ShallowClone()
+        {
+            Document clone = new Document(BaseUri);
+            if (attributes != null)
+            {
+                clone.attributes = attributes.Clone();
+            }
+
+            clone.outputSettings = outputSettings.Clone();
+            return clone;
+        }
+        
+        private void EnsureMetaCharsetElement() {
+            if (UpdateMetaCharsetElement) {
+                DocumentSyntax syntax = outputSettings.Syntax;
+
+                if (syntax == DocumentSyntax.Html) {
+                    Element metaCharset = SelectFirst("meta[charset]");
+                    if (metaCharset != null) {
+                        metaCharset.Attr("charset", Charset.WebName);
+                    } else {
+                        Head.AppendElement("meta").Attr("charset", Charset.WebName);
+                    }
+                    Select("meta[name=charset]").Remove(); // Remove obsolete elements
+                } else if (syntax ==DocumentSyntax.Xml) {
+                    Node node = EnsureChildNodes()[0];
+                    if (node is XmlDeclaration decl) {
+                        if (decl.Name.Equals("xml")) {
+                            decl.Attr("encoding", Charset.WebName);
+                            if (decl.HasAttr("version"))
+                                decl.Attr("version", "1.0");
+                        } else {
+                            decl = new XmlDeclaration("xml", false);
+                            decl.Attr("version", "1.0");
+                            decl.Attr("encoding", Charset.WebName);
+                            PrependChild(decl);
+                        }
+                    } else {
+                        XmlDeclaration decl1 = new XmlDeclaration("xml", false);
+                        decl1.Attr("version", "1.0");
+                        decl1.Attr("encoding", Charset.WebName);
+                        PrependChild(decl1);
+                    }
+                }
+            }
         }
 
         /// <summary>

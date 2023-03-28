@@ -95,7 +95,7 @@ public abstract class LeafNode : Node
         return this;
     }
 
-    protected override List<Node> EnsureChildNodes()
+    internal override List<Node> EnsureChildNodes()
     {
         return EmptyNodes;
     }

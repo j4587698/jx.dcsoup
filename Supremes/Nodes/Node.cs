@@ -246,7 +246,7 @@ namespace Supremes.Nodes
         /// 
         /// </summary>
         /// <returns></returns>
-        protected abstract List<Node> EnsureChildNodes();
+        internal abstract List<Node> EnsureChildNodes();
         
         /// <summary>
         /// Get a child node by its 0-based index.
@@ -916,7 +916,7 @@ namespace Supremes.Nodes
         /// .
         /// </remarks>
         /// <returns>stand-alone cloned node</returns>
-        internal virtual Node Clone()
+        public virtual Node Clone()
         {
             Node thisClone = DoClone(null);
             // splits for orphan

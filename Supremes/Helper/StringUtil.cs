@@ -133,6 +133,26 @@ namespace Supremes.Helper
                 outChars[i] = ' ';
             return new string(outChars);
         }
+        
+        /// <summary>
+        /// Tests if a string is blank: null, empty, or only whitespace (" ", \r\n, \t, etc)
+        /// </summary>
+        /// <param name="str">string to test</param>
+        /// <returns>if string is blank</returns>
+        public static bool IsBlank(string str)
+        {
+            if (string.IsNullOrEmpty(str))
+                return true;
+
+            int l = str.Length;
+            for (int i = 0; i < l; i++)
+            {
+                if (!char.IsWhiteSpace(str[i]))
+                    return false;
+            }
+            return true;
+        }
+
 
         /// <summary>
         /// Tests if a string is numeric
