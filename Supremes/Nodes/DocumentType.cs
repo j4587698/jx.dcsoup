@@ -7,7 +7,7 @@ namespace Supremes.Nodes
     /// <c>&lt;!DOCTYPE&gt;</c>
     /// node.
     /// </summary>
-    internal sealed class DocumentType : Node
+    public sealed class DocumentType : Node
     {
         /// <summary>
         /// Create a new doctype element.

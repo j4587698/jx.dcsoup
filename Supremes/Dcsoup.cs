@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using Supremes.Helper;
 
 namespace Supremes
 {
@@ -103,6 +104,48 @@ namespace Supremes
         public static Document Parse(string html, Parser parser)
         {
             return parser.ParseInput(html, string.Empty);
+        }
+
+        /// <summary>
+        /// Creates a new {@link Connection} (session), with the defined request URL. Use to fetch and parse a HTML page.
+        /// <p>
+        /// Use examples:
+        /// <ul>
+        ///  <li><code>Document doc = Jsoup.connect("http://example.com").userAgent("Mozilla").data("name", "jsoup").get();</code></li>
+        ///  <li><code>Document doc = Jsoup.connect("http://example.com").cookie("auth", "token").post();</code></li>
+        /// </ul>
+        /// </summary>
+        /// <param name="url">URL to connect to. The protocol must be {@code http} or {@code https}.</param>
+        /// <returns>the connection. You can add data, cookies, and headers; set the user-agent, referrer, method; and then execute.</returns>
+        public static IConnection Connect(string url)
+        {
+            return HttpConnection.Connect(url);
+        }
+
+        /// <summary>
+        ///      Creates a new {@link Connection} to use as a session. Connection settings (user-agent, timeouts, URL, etc), and
+        /// cookies will be maintained for the session. Use examples:
+        /// <pre><code>
+        /// Connection session = Jsoup.newSession()
+        ///     .timeout(20 * 1000)
+        ///     .userAgent("FooBar 2000");
+        /// 
+        /// Document doc1 = session.newRequest()
+        ///     .url("https://jsoup.org/").data("ref", "example")
+        ///     .get();
+        /// Document doc2 = session.newRequest()
+        ///     .url("https://en.wikipedia.org/wiki/Main_Page")
+        ///     .get();
+        /// Connection con3 = session.newRequest();
+        ///     </code></pre>
+        /// 
+        /// <p>For multi-threaded requests, it is safe to use this session between threads, but take care to call {@link
+        ///     Connection#newRequest()} per request and not share that instance between threads when executing or parsing.</p>
+        /// </summary>
+        /// <returns></returns>
+        public static IConnection NewSession()
+        {
+            return new HttpConnection();
         }
 
         /// <summary>

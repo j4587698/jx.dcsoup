@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Supremes.Parsers;
+using Supremes.Select;
 
 namespace Supremes.Nodes
 {
@@ -264,14 +265,53 @@ namespace Supremes.Nodes
         /// <returns>location</returns>
         public string Location { get; }
 
+        /// <summary>
+        /// Returns the Connection (Request/Response) object that was used to fetch this document, if any; otherwise, a new
+        /// default Connection object. This can be used to continue a session, preserving settings and cookies, etc.
+        /// </summary>
+        /// <returns>the Connection (session) associated with this Document, or an empty one otherwise.</returns>
         public IConnection Connection()
         {
-            if (connection == null)
+            return connection ?? Dcsoup.NewSession();
+        }
+
+        /// <summary>
+        /// Returns this Document's doctype.
+        /// </summary>
+        public DocumentType DocumentType
+        {
+            get
             {
-                return Dcsoup.NewSession();
+                foreach (var childNode in childNodes)
+                {
+                    if (childNode is DocumentType documentType)
+                    {
+                        return documentType;
+                    }
+
+                    if (childNode is not LeafNode)
+                    {
+                        break;
+                    }
+                }
+
+                return null;
             }
         }
-        
+
+        private Element HtmlEl
+        {
+            get
+            {
+                foreach (var element in ChildElementsList().Where(element => element.NormalName == "html"))
+                {
+                    return element;
+                }
+
+                return AppendElement("html");
+            }
+        }
+
         /// <summary>
         /// Accessor to the document's
         /// <c>head</c>
@@ -282,7 +322,16 @@ namespace Supremes.Nodes
         /// </returns>
         public Element Head
         {
-            get { return FindFirstElementByTagName("head", this); }
+            get
+            {
+                var html = HtmlEl;
+                foreach (var element in ChildElementsList().Where(element => element.NormalName == "head"))
+                {
+                    return element;
+                }
+
+                return html.PrependElement("head");
+            }
         }
 
         /// <summary>
@@ -291,7 +340,41 @@ namespace Supremes.Nodes
         /// <returns><c>body</c></returns>
         public Element Body
         {
-            get { return FindFirstElementByTagName("body", this); }
+            get
+            {
+                var html = HtmlEl;
+                foreach (var element in ChildElementsList().Where(element => element.NormalName is "frameset" or "body"))
+                {
+                    return element;
+                }
+
+                return html.PrependElement("body");
+            }
+        }
+
+        /// <summary>
+        /// Get each of the {@code <form>} elements contained in this document.
+        /// </summary>
+        public IReadOnlyList<FormElement> Forms => Select("form").Forms;
+        
+        /// <summary>
+        /// Selects the first {@link FormElement} in this document that matches the query. If none match, throws an
+        /// {@link IllegalArgumentException}.
+        /// </summary>
+        /// <param name="cssQuery"></param>
+        /// <returns></returns>
+        public FormElement ExpectForm(string cssQuery)
+        {
+            var els = Select(cssQuery);
+            foreach (var element in els)
+            {
+                if (element is FormElement formElement)
+                {
+                    return formElement;
+                }
+            }
+            Validate.Fail($"No form elements matched the query '{cssQuery}' in the document.");
+            return null;
         }
 
         /// <summary>
@@ -308,14 +391,14 @@ namespace Supremes.Nodes
             get
             {
                 // title is a preserve whitespace tag (for document output), but normalised here
-                Element titleEl = GetElementsByTag("title").First;
+                Element titleEl = Head.SelectFirst(titleEval);
                 return titleEl != null ? StringUtil.NormaliseWhitespace(titleEl.Text).Trim() :
                     string.Empty;
             }
             set
             {
                 Validate.NotNull(value);
-                Element titleEl = GetElementsByTag("title").First;
+                Element titleEl = Head.SelectFirst(titleEval);
                 if (titleEl == null)
                 {
                     // add to head
@@ -327,6 +410,8 @@ namespace Supremes.Nodes
                 }
             }
         }
+        
+        private static readonly Evaluator titleEval = new Evaluator.Tag("title");
 
         /// <summary>
         /// Create a new Element, with this document's base uri.
@@ -342,8 +427,8 @@ namespace Supremes.Nodes
         /// <returns>new element</returns>
         public Element CreateElement(string tagName)
         {
-            Tag tag = Supremes.Nodes.Tag.ValueOf(tagName);
-            return new Element(tag, this.BaseUri());
+            Tag tag = Supremes.Nodes.Tag.ValueOf(tagName, ParseSettings.PreserveCase);
+            return new Element(tag, this.BaseUri);
         }
 
         /// <summary>
