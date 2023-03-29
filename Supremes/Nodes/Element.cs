@@ -68,7 +68,7 @@ namespace Supremes.Nodes
         /// 
         /// </summary>
         /// <returns></returns>
-        protected override List<Node> EnsureChildNodes()
+        internal override List<Node> EnsureChildNodes()
         {
             if (Equals(childNodes, EmptyNodes))
             {
@@ -707,7 +707,7 @@ namespace Supremes.Nodes
         /// <returns>this element, for chaining.</returns>
         public Element InsertChildren(int index, params Node[] children)
         {
-            return InsertChildren(index, children);
+            return InsertChildren(index, children.ToList());
         }
 
         /// <summary>
